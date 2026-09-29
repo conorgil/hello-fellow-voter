@@ -10,6 +10,7 @@
   --color-success: #15803d;
   --radius: 10px;
   --gap: 1rem;
+  --gh-corner-size: 58px;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -100,6 +101,7 @@ button {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1.5rem;
+  padding-right: calc(var(--gh-corner-size) + 0.5rem);
 }
 
 .project-list-empty {
@@ -155,6 +157,7 @@ button {
   gap: 1rem;
   margin-bottom: 1rem;
   flex-wrap: wrap;
+  padding-right: calc(var(--gh-corner-size) + 0.5rem);
 }
 
 .board-header__title-wrap {
@@ -919,3 +922,12 @@ button {
   font-size: 1.1rem;
   color: var(--color-text-muted);
 }
+
+/*
+ * .gh-corner / .gh-corner__icon are defined inline in index.html's <head>,
+ * not here. That markup is static HTML present on first paint, before this
+ * stylesheet (loaded via a JS import) reaches the page in dev mode, so its
+ * styling has to ship in the document itself or it flashes unstyled.
+ * If you change its look, edit both this comment's neighbor in index.html
+ * and keep --gh-corner-size (below) in sync with the size used there.
+ */
