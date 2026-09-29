@@ -10,6 +10,7 @@ import {
   deleteColumn,
   deleteVoter,
   getColumns,
+  getProjectMessage,
   getVotersForProject,
   getSuspectQueue,
   moveVoter,
@@ -19,6 +20,7 @@ import {
   renameColumn,
   renameProject,
   reorderColumns,
+  setProjectMessage,
   undo,
 } from './storage';
 import { DEFAULT_COLUMNS, type Project } from './types';
@@ -207,6 +209,30 @@ describe('project name uniqueness', () => {
   });
 });
 
+describe('project message', () => {
+  it('defaults to an empty string for a freshly created project', () => {
+    const project = mustCreateProject('Message Default Project');
+    expect(getProjectMessage(project.id)).toBe('');
+  });
+
+  it('round-trips a stored message', () => {
+    const project = mustCreateProject('Message Round Trip Project');
+    setProjectMessage(project.id, 'Please vote by Nov 5!');
+    expect(getProjectMessage(project.id)).toBe('Please vote by Nov 5!');
+  });
+
+  it('trims whitespace when storing', () => {
+    const project = mustCreateProject('Message Trim Project');
+    setProjectMessage(project.id, '  Please vote!  ');
+    expect(getProjectMessage(project.id)).toBe('Please vote!');
+  });
+
+  it('is a no-op for an unknown project id', () => {
+    expect(() => setProjectMessage('not-a-real-id', 'Hello')).not.toThrow();
+    expect(getProjectMessage('not-a-real-id')).toBe('');
+  });
+});
+
 describe('column defaults', () => {
   it('seeds a new project with the 5 default columns', () => {
     const project = mustCreateProject('Columns Default Project');
@@ -355,5 +381,20 @@ describe('column migration backfill', () => {
     const columns = getColumns('legacy-project');
     expect(columns).toEqual(DEFAULT_COLUMNS);
     expect(columns.some((c) => c.id === 'todo')).toBe(true);
+  });
+});
+
+describe('message migration backfill', () => {
+  it('backfills an empty message for pre-existing projects with no stored message', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-project', name: 'Legacy Project', createdAt: '2025-01-01T00:00:00.000Z' }],
+      activeProjectId: 'legacy-project',
+      voters: [],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    expect(getProjectMessage('legacy-project')).toBe('');
   });
 });

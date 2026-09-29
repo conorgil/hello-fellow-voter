@@ -1,6 +1,7 @@
 import './style.css';
 import { renderBoardView } from './board/render';
 import { clearSelection, getSelectedCount } from './board/selection';
+import { isRedoShortcut, isUndoShortcut } from './keyboardShortcuts';
 import { renderProjectList } from './projects/projectListView';
 import { isSplashPermanentlyDismissed } from './splash/splashPrefs';
 import { openSplash } from './splash/splashView';
@@ -29,17 +30,15 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  const hasModifier = e.metaKey || e.ctrlKey;
-  const key = e.key.toLowerCase();
-  const isUndoShortcut = hasModifier && !e.shiftKey && key === 'z';
-  const isRedoShortcut = (hasModifier && e.shiftKey && key === 'z') || (e.ctrlKey && key === 'y');
-  if (!isUndoShortcut && !isRedoShortcut) return;
+  const isUndo = isUndoShortcut(e);
+  const isRedo = isRedoShortcut(e);
+  if (!isUndo && !isRedo) return;
 
   const target = e.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
   e.preventDefault();
 
-  const applied = isUndoShortcut ? undo() : redo();
+  const applied = isUndo ? undo() : redo();
   if (applied) {
     clearSelection();
     render();

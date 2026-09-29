@@ -1,5 +1,6 @@
 import stampImageUrl from '../assets/stamp.jpg';
-import { getColumns, getVotersForProject, moveVoter } from '../storage';
+import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
+import { getColumns, getProjectMessage, getVotersForProject, moveVoter, setProjectMessage } from '../storage';
 import type { Voter } from '../types';
 import { showToast } from '../ui/toast';
 
@@ -79,17 +80,81 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   const message = document.createElement('div');
   message.className = 'postcard__message';
 
-  for (let i = 0; i < 3; i++) {
-    const ruleLine = document.createElement('div');
-    ruleLine.className = 'postcard__rule-line';
-    if (i === 0) {
-      const messagePlaceholder = document.createElement('span');
-      messagePlaceholder.className = 'postcard__message-placeholder';
-      messagePlaceholder.textContent = 'Your message goes here!';
-      ruleLine.appendChild(messagePlaceholder);
+  let currentMessage = getProjectMessage(projectId);
+
+  function showMessageDisplay(): void {
+    // A real <button> vertically centers its content via Chromium's internal
+    // layout for button elements, which can't be overridden with CSS on the
+    // button itself — use a div+role="button" instead, matching the voter-card
+    // clickable-area pattern in src/board/voter.ts.
+    const clickable = document.createElement('div');
+    clickable.className = 'postcard__message-display';
+    clickable.tabIndex = 0;
+    clickable.setAttribute('role', 'button');
+    clickable.setAttribute('aria-label', 'Edit postcard message');
+
+    if (currentMessage) {
+      const text = document.createElement('span');
+      text.className = 'postcard__message-text';
+      text.textContent = currentMessage;
+      clickable.appendChild(text);
+    } else {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'postcard__message-placeholder';
+      placeholder.textContent = 'Your message goes here. Click this text to customize!';
+      clickable.appendChild(placeholder);
     }
-    message.appendChild(ruleLine);
+
+    clickable.addEventListener('click', showMessageEditor);
+    clickable.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        showMessageEditor();
+      }
+    });
+    message.replaceChildren(clickable);
   }
+
+  function showMessageEditor(): void {
+    const form = document.createElement('form');
+    const textarea = document.createElement('textarea');
+    textarea.className = 'postcard__message-textarea';
+    textarea.value = currentMessage;
+    textarea.maxLength = 500;
+    form.appendChild(textarea);
+    message.replaceChildren(form);
+
+    let cancelled = false;
+
+    function commit(): void {
+      currentMessage = textarea.value.trim();
+      setProjectMessage(projectId, currentMessage);
+      showMessageDisplay();
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      commit();
+    });
+
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        cancelled = true;
+        showMessageDisplay();
+      }
+    });
+
+    textarea.addEventListener('blur', () => {
+      if (cancelled) return;
+      commit();
+    });
+
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  }
+
+  showMessageDisplay();
 
   const right = document.createElement('div');
   right.className = 'postcard__right';
@@ -196,6 +261,18 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   }
 
   function onKeydown(e: KeyboardEvent): void {
+    const active = document.activeElement;
+    if (active instanceof HTMLTextAreaElement && panel.contains(active)) return;
+
+    // The global undo/redo shortcut (main.ts) has already mutated storage by the
+    // time this listener runs (it was registered first), but it only re-renders
+    // the board underneath — this modal is a standalone overlay, so its message
+    // display needs its own refresh to pick up the reverted/reapplied value.
+    if (isUndoShortcut(e) || isRedoShortcut(e)) {
+      currentMessage = getProjectMessage(projectId);
+      showMessageDisplay();
+    }
+
     if (e.key === 'Escape') {
       close();
     } else if (e.key === 'ArrowRight') {

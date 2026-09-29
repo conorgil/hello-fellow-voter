@@ -17,6 +17,7 @@ export interface Project {
   id: string;
   name: string;
   createdAt: string;
+  message: string;
 }
 
 export interface Voter {

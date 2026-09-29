@@ -34,6 +34,8 @@ function loadState(): StoredState {
       if (!parsed.columns[project.id]) {
         parsed.columns[project.id] = cloneDefaultColumns();
       }
+      // Older stored state predates the shared per-project postcard message.
+      if (typeof project.message !== 'string') project.message = '';
     }
     return parsed as StoredState;
   } catch (err) {
@@ -123,6 +125,7 @@ export function createProject(name: string): Project | null {
     id: crypto.randomUUID(),
     name: name.trim(),
     createdAt: new Date().toISOString(),
+    message: '',
   };
   state.projects.push(project);
   state.activeProjectId = project.id;
@@ -140,6 +143,20 @@ export function renameProject(id: string, name: string): boolean {
   project.name = name.trim();
   saveState(state);
   return true;
+}
+
+export function getProjectMessage(id: string): string {
+  const project = loadState().projects.find((p) => p.id === id);
+  return project?.message ?? '';
+}
+
+/** Silently no-ops if the project doesn't exist. */
+export function setProjectMessage(id: string, message: string): void {
+  const state = loadState();
+  const project = state.projects.find((p) => p.id === id);
+  if (!project) return;
+  project.message = message.trim();
+  saveState(state);
 }
 
 export function deleteProject(id: string): void {
