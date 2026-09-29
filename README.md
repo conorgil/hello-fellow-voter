@@ -4,6 +4,8 @@ A small, static web app that makes it easier to hand-write get-out-the-vote (GOT
 
 If you volunteer with an organization that mails postcards to voters (e.g. [Vote Forward](https://votefwd.org/get-involved), [Signs of Justice](https://www.signsofjustice.com/products/voter-postcard-kit)), you already know the drill: you get a list of names and addresses, and you need to hand-copy each one onto a postcard while keeping track of which ones you've finished. This app exists to make that process faster and less error-prone.
 
+<img width="545" height="300" alt="demo-03" src="https://github.com/user-attachments/assets/2a9463e9-146e-4483-a11d-6ac8f54fd1bb" />
+
 **No account required.** Just open the app and start importing your voter list — there's nothing to sign up for and nothing to configure.
 
 **Your data never leaves your browser.** Everything — your voter lists, your progress, your columns — is stored locally in your browser's `localStorage`. The app makes no network requests other than loading its own code, so no server, and no volunteer organization, ever sees your data or your progress. (Since organizations *do* want to know who was contacted, the app includes a PDF export so you can report your progress back to them yourself.)
