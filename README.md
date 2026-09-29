@@ -2,7 +2,7 @@
 
 A small, static web app that makes it easier to hand-write get-out-the-vote (GOTV) postcards and letters — no account, no sign-up, and nothing ever leaves your browser.
 
-If you volunteer with an organization that mails postcards to voters (e.g. [Vote Forward](https://votefwd.org/get-involved), [Signs of Justice](https://www.signsofjustice.com/products/voter-postcard-kit)), you already know the drill: you get a list of names and addresses, and you need to hand-copy each one onto a postcard while keeping track of which ones you've finished. This app exists to make that process faster and less error-prone.
+If you volunteer with an organization that mails postcards to voters (e.g. [Vote Forward](https://votefwd.org/get-involved), [Progressive Turnout Project](https://turnoutpac.org/postcards/), [Signs of Justice](https://www.signsofjustice.com/products/voter-postcard-kit)), you already know the drill: you get a big list of names and addresses, and you need to hand-copy each one onto a postcard while keeping track of which ones you've finished. This app exists to make that process faster and less error-prone.
 
 <img width="545" height="300" alt="demo-03" src="https://github.com/user-attachments/assets/2a9463e9-146e-4483-a11d-6ac8f54fd1bb" />
 
