@@ -1,10 +1,10 @@
-import type { Column, ColumnId, Project, StoredState, Voter } from './types';
+import type { Column, ColumnAutomation, ColumnId, Project, StoredState, Voter } from './types';
 import { DEFAULT_COLUMNS } from './types';
 
 const STORAGE_KEY = 'hello-fellow-voter:v1';
 
 function cloneDefaultColumns(): Column[] {
-  return DEFAULT_COLUMNS.map((c) => ({ ...c }));
+  return DEFAULT_COLUMNS.map((c) => ({ ...c, automation: { ...c.automation } }));
 }
 
 function emptyState(): StoredState {
@@ -36,6 +36,25 @@ function loadState(): StoredState {
       }
       // Older stored state predates the shared per-project postcard message.
       if (typeof project.message !== 'string') project.message = '';
+
+      // Older stored state predates configurable column automation; backfill the
+      // equivalent of the old hardcoded Done/Next-voter behavior.
+      const cols: Column[] = parsed.columns[project.id];
+      const first = cols[0];
+      const second = cols[1];
+      const third = cols[2];
+      cols.forEach((col, i) => {
+        if (col.automation) return;
+        const next = cols[i + 1];
+        const isWritingStage = !!first && !!second && (col.id === first.id || col.id === second.id);
+        col.automation = {
+          onOpenMoveTo: first && second && col.id === first.id ? second.id : null,
+          doneMoveTo: second && third && col.id === second.id ? third.id : null,
+          nextVoterMoveTo: next ? next.id : null,
+          pullFrom: isWritingStage ? first.id : null,
+          pullTo: isWritingStage ? second.id : null,
+        };
+      });
     }
     return parsed as StoredState;
   } catch (err) {
@@ -185,7 +204,11 @@ export function addColumn(projectId: string, label: string): Column | null {
   const state = loadState();
   const columns = state.columns[projectId] ?? [];
   if (isDuplicateColumnLabel(columns, label)) return null;
-  const column: Column = { id: crypto.randomUUID(), label: label.trim() };
+  const column: Column = {
+    id: crypto.randomUUID(),
+    label: label.trim(),
+    automation: { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null },
+  };
   state.columns[projectId] = [...columns, column];
   saveState(state);
   return column;
@@ -199,6 +222,17 @@ export function renameColumn(projectId: string, columnId: string, label: string)
   if (!column) return false;
   if (isDuplicateColumnLabel(columns, label, columnId)) return false;
   column.label = label.trim();
+  saveState(state);
+  return true;
+}
+
+/** Returns false if the column doesn't exist. */
+export function setColumnAutomation(projectId: string, columnId: string, automation: ColumnAutomation): boolean {
+  const state = loadState();
+  const columns = state.columns[projectId] ?? [];
+  const column = columns.find((c) => c.id === columnId);
+  if (!column) return false;
+  column.automation = automation;
   saveState(state);
   return true;
 }

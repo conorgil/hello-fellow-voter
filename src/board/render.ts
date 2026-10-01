@@ -1,4 +1,5 @@
 import { exportVoterStatusPdf } from '../export/exportVoterStatusPdf';
+import { openColumnAutomationForm } from '../forms/columnAutomationForm';
 import { openVoterForm } from '../forms/voterForm';
 import { openPasteImportForm } from '../forms/pasteImportForm';
 import { openPdfImportForm } from '../forms/pdfImportForm';
@@ -262,6 +263,7 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
           },
           disabled: columnVoterIds.length === 0,
         },
+        { label: 'Edit automation', onSelect: () => openColumnAutomationForm(project.id, column, rerender) },
         { label: 'Rename column', onSelect: showColumnTitleEditor },
         {
           label: 'Delete column',

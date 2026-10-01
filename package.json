@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -16,6 +17,7 @@
     "pdfjs-dist": "^4.6.82"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "typescript": "^5.6.2",
     "vite": "^5.4.8",
     "vitest": "^2.1.1"

@@ -93,10 +93,11 @@ describe('summarizeByStatus', () => {
   });
 
   it('sorts and labels according to a custom, reordered column list', () => {
+    const noAutomation = { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null };
     const customColumns = [
-      { id: 'inbox', label: 'Inbox' },
-      { id: 'drafting', label: 'Drafting' },
-      { id: 'sent', label: 'Sent' },
+      { id: 'inbox', label: 'Inbox', automation: noAutomation },
+      { id: 'drafting', label: 'Drafting', automation: noAutomation },
+      { id: 'sent', label: 'Sent', automation: noAutomation },
     ];
     const voters: Voter[] = [
       makeVoter({ id: '1', name: 'Zeke Sent', status: 'sent' }),

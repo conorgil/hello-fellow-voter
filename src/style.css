@@ -496,6 +496,7 @@ button {
 }
 
 .detail-panel__close {
+  position: relative;
   width: 2rem;
   height: 2rem;
   display: inline-flex;
@@ -643,6 +644,13 @@ button {
   color: var(--color-primary);
 }
 
+.tooltip--above {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.4rem;
+}
+
 .postcard-address {
   flex: 1;
   display: flex;
@@ -667,6 +675,7 @@ button {
 }
 
 .detail-panel__advance {
+  position: relative;
   font-size: 1.1rem;
   padding: 0.75rem 1.5rem;
 }
@@ -821,6 +830,53 @@ button {
   width: min(480px, 90vw);
 }
 
+.automation-panel {
+  width: min(640px, 92vw);
+}
+
+.automation-group {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.5rem 1rem 0.1rem;
+  margin: 0 0 1rem;
+}
+
+.automation-group legend {
+  padding: 0 0.4rem;
+  margin-left: 0.5rem;
+  font-weight: 400;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.automation-group legend strong {
+  font-weight: 600;
+}
+
+.automation-actions {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.automation-action {
+  margin: 0.5rem 0;
+}
+
+.automation-pull-action {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+
+.automation-action-label {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
 .pdf-drop-zone {
   display: flex;
   flex-direction: column;
@@ -879,12 +935,33 @@ button {
   color: var(--color-text-muted);
 }
 
-.form-field input {
+.form-field input,
+.form-field select {
   font-size: 1rem;
   padding: 0.5rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   color: var(--color-text);
+}
+
+.automation-field {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.25rem;
+}
+
+.automation-field select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automation-field[hidden] {
+  display: none;
 }
 
 .form-actions {

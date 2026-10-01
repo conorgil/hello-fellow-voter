@@ -2,6 +2,11 @@ node_modules
 dist
 *.local
 /plans
+/test-data
+/test-results
+/playwright-report
+/playwright/.cache
+
 
 # Contains real voter names/addresses; the vendor's terms restrict
 # retaining/sharing this data beyond mailing the postcards.

@@ -20,6 +20,7 @@ import {
   renameColumn,
   renameProject,
   reorderColumns,
+  setColumnAutomation,
   setProjectMessage,
   undo,
 } from './storage';
@@ -268,6 +269,46 @@ describe('addColumn', () => {
     expect(addColumn(a.id, 'Shared Label')).not.toBeNull();
     expect(addColumn(b.id, 'Shared Label')).not.toBeNull();
   });
+
+  it('gives a new column all-null automation', () => {
+    const project = mustCreateProject('Add Column Automation Project');
+    const column = addColumn(project.id, 'Follow Up');
+    expect(column?.automation).toEqual({
+      onOpenMoveTo: null,
+      doneMoveTo: null,
+      nextVoterMoveTo: null,
+      pullFrom: null,
+      pullTo: null,
+    });
+  });
+});
+
+describe('setColumnAutomation', () => {
+  it('round-trips an automation config', () => {
+    const project = mustCreateProject('Set Automation Project');
+    const [first, second, third] = getColumns(project.id);
+    const automation = {
+      onOpenMoveTo: second.id,
+      doneMoveTo: third.id,
+      nextVoterMoveTo: second.id,
+      pullFrom: first.id,
+      pullTo: second.id,
+    };
+    expect(setColumnAutomation(project.id, first.id, automation)).toBe(true);
+    expect(getColumns(project.id).find((c) => c.id === first.id)?.automation).toEqual(automation);
+  });
+
+  it('returns false for an unknown column id', () => {
+    const project = mustCreateProject('Set Automation Unknown Column Project');
+    const automation = {
+      onOpenMoveTo: null,
+      doneMoveTo: null,
+      nextVoterMoveTo: null,
+      pullFrom: null,
+      pullTo: null,
+    };
+    expect(setColumnAutomation(project.id, 'not-a-real-id', automation)).toBe(false);
+  });
 });
 
 describe('renameColumn', () => {
@@ -381,6 +422,33 @@ describe('column migration backfill', () => {
     const columns = getColumns('legacy-project');
     expect(columns).toEqual(DEFAULT_COLUMNS);
     expect(columns.some((c) => c.id === 'todo')).toBe(true);
+  });
+
+  it('reconstructs automation from column position for pre-existing custom columns with no automation field', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-custom-project', name: 'Legacy Custom Project', createdAt: '2025-01-01T00:00:00.000Z' }],
+      activeProjectId: 'legacy-custom-project',
+      voters: [],
+      suspectQueues: {},
+      columns: {
+        'legacy-custom-project': [
+          { id: 'a', label: 'Alpha' },
+          { id: 'b', label: 'Beta' },
+          { id: 'c', label: 'Gamma' },
+          { id: 'd', label: 'Delta' },
+        ],
+      },
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    const columns = getColumns('legacy-custom-project');
+    expect(columns.map((c) => c.automation)).toEqual([
+      { onOpenMoveTo: 'b', doneMoveTo: null, nextVoterMoveTo: 'b', pullFrom: 'a', pullTo: 'b' },
+      { onOpenMoveTo: null, doneMoveTo: 'c', nextVoterMoveTo: 'c', pullFrom: 'a', pullTo: 'b' },
+      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: 'd', pullFrom: null, pullTo: null },
+      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null },
+    ]);
   });
 });
 

@@ -1,7 +1,7 @@
 import stampImageUrl from '../assets/stamp.jpg';
 import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
 import { getColumns, getProjectMessage, getVotersForProject, moveVoter, setProjectMessage } from '../storage';
-import type { Voter } from '../types';
+import { DONE_STAY, type Voter } from '../types';
 import { showToast } from '../ui/toast';
 
 /**
@@ -23,12 +23,9 @@ function shrinkLinesToFit(lines: HTMLElement[]): void {
   }
 }
 
-function attachTooltip(el: HTMLElement, html: string, ariaLabel: string, delayMs: number): void {
-  const tooltip = document.createElement('div');
-  tooltip.className = 'tooltip';
-  tooltip.innerHTML = html;
+function attachTooltipElement(el: HTMLElement, tooltip: HTMLElement, delayMs: number, placement: 'below' | 'above'): void {
+  tooltip.className = placement === 'above' ? 'tooltip tooltip--above' : 'tooltip';
   tooltip.hidden = true;
-  el.setAttribute('aria-label', ariaLabel);
   el.appendChild(tooltip);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -45,16 +42,31 @@ function attachTooltip(el: HTMLElement, html: string, ariaLabel: string, delayMs
   });
 }
 
+function attachTooltip(el: HTMLElement, html: string, ariaLabel: string, delayMs: number): void {
+  el.setAttribute('aria-label', ariaLabel);
+  const tooltip = document.createElement('div');
+  tooltip.innerHTML = html;
+  attachTooltipElement(el, tooltip, delayMs, 'below');
+}
+
+/** Like `attachTooltip`, but for a button that already has its own visible label/aria-label — leaves it untouched. */
+function attachTextTooltip(el: HTMLElement, text: string, delayMs: number, placement: 'below' | 'above' = 'below'): void {
+  const tooltip = document.createElement('div');
+  tooltip.textContent = text;
+  attachTooltipElement(el, tooltip, delayMs, placement);
+}
+
 export function openDetailView(voter: Voter, projectId: string, rerender: () => void): void {
   const columns = getColumns(projectId);
-  const firstColumn = columns[0];
-  const secondColumn = columns[1];
-  const thirdColumn = columns[2];
+  const openingColumn = columns.find((c) => c.id === voter.status);
+  const onOpenTargetColumn = openingColumn?.automation.onOpenMoveTo
+    ? columns.find((c) => c.id === openingColumn.automation.onOpenMoveTo)
+    : undefined;
 
-  if (firstColumn && secondColumn && voter.status === firstColumn.id) {
-    moveVoter(voter.id, secondColumn.id, null);
-    voter = { ...voter, status: secondColumn.id };
-    showToast(`Moved ${voter.name} to the ${secondColumn.label} column`, 'success');
+  if (onOpenTargetColumn) {
+    moveVoter(voter.id, onOpenTargetColumn.id, null);
+    voter = { ...voter, status: onOpenTargetColumn.id };
+    showToast(`Moved ${voter.name} to the ${onOpenTargetColumn.label} column`, 'success');
     rerender();
   }
 
@@ -69,6 +81,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   closeBtn.setAttribute('aria-label', 'Close');
   closeBtn.textContent = '×';
   closeBtn.addEventListener('click', close);
+  attachTextTooltip(closeBtn, 'Closes address view without any automations', 400);
 
   const closeRow = document.createElement('div');
   closeRow.className = 'detail-panel__close-row';
@@ -192,30 +205,65 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   right.append(stamp, address);
   postcard.append(message, right);
 
-  const columnIndex = columns.findIndex((c) => c.id === voter.status);
-  const isLast = columnIndex === -1 || columnIndex === columns.length - 1;
+  const currentColumn = columns.find((c) => c.id === voter.status);
+  const automation = currentColumn?.automation;
+  const doneStaysInPlace = automation?.doneMoveTo === DONE_STAY;
+  const doneTargetColumn =
+    automation?.doneMoveTo && automation.doneMoveTo !== DONE_STAY
+      ? columns.find((c) => c.id === automation.doneMoveTo)
+      : undefined;
+  const nextTargetColumn = automation?.nextVoterMoveTo
+    ? columns.find((c) => c.id === automation.nextVoterMoveTo)
+    : undefined;
+
+  const pullFromColumn = automation?.pullFrom ? columns.find((c) => c.id === automation.pullFrom) : undefined;
+  const pullToColumn = automation?.pullTo ? columns.find((c) => c.id === automation.pullTo) : undefined;
+  const pullCandidate =
+    pullFromColumn && pullToColumn
+      ? getVotersForProject(projectId)
+          .filter((v) => v.status === pullFromColumn.id && v.id !== voter.id)
+          .sort((a, b) => a.order - b.order)[0]
+      : undefined;
+  // When the automation is configured to pull a new voter and that column has
+  // none left, the voter being viewed is already the last one — showing a
+  // "Next voter" button would just advance into an empty pull with nothing to
+  // open next, so hide it and leave only Done.
+  const pullQueueEmpty = !!pullFromColumn && !!pullToColumn && !pullCandidate;
 
   const footer = document.createElement('div');
   footer.className = 'detail-panel__footer';
 
-  if (secondColumn && thirdColumn && voter.status === secondColumn.id) {
+  if (doneStaysInPlace || doneTargetColumn) {
     const doneBtn = document.createElement('button');
     doneBtn.className = 'btn btn--secondary detail-panel__advance';
     doneBtn.textContent = 'Done';
+    const doneTooltip = doneTargetColumn
+      ? `Moves ${voter.name} to ${doneTargetColumn.label} and closes address view`
+      : `Closes address view without moving ${voter.name}`;
+    attachTextTooltip(doneBtn, doneTooltip, 400, 'above');
     doneBtn.addEventListener('click', () => {
-      moveVoter(voter.id, thirdColumn.id, null);
+      if (doneTargetColumn) {
+        moveVoter(voter.id, doneTargetColumn.id, null);
+        showToast(`Moved ${voter.name} to the ${doneTargetColumn.label} column`, 'success');
+      }
       close();
       rerender();
     });
     footer.append(doneBtn);
   }
 
-  const advanceBtn = document.createElement('button');
-  advanceBtn.className = 'btn btn--primary detail-panel__advance';
-  advanceBtn.textContent = 'Next voter';
-  advanceBtn.disabled = isLast;
-  advanceBtn.addEventListener('click', goToNextVoter);
-  footer.append(advanceBtn);
+  if (nextTargetColumn && !pullQueueEmpty) {
+    const advanceBtn = document.createElement('button');
+    advanceBtn.className = 'btn btn--primary detail-panel__advance';
+    advanceBtn.textContent = 'Next voter';
+    let nextTooltip = `Moves ${voter.name} to ${nextTargetColumn.label}`;
+    if (pullCandidate && pullFromColumn && pullToColumn) {
+      nextTooltip += ` and ${pullCandidate.name} from ${pullFromColumn.label} to ${pullToColumn.label}`;
+    }
+    attachTextTooltip(advanceBtn, nextTooltip, 400, 'above');
+    advanceBtn.addEventListener('click', goToNextVoter);
+    footer.append(advanceBtn);
+  }
 
   panel.append(closeRow, postcard, footer);
   overlay.appendChild(panel);
@@ -224,33 +272,20 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   shrinkLinesToFit([nameLine, streetLine, cityLine]);
 
   function goToNextVoter(): void {
-    if (isLast) return;
-    const originalStatus = voter.status;
-    const nextColumn = columns[columnIndex + 1];
-    moveVoter(voter.id, nextColumn.id, null);
-    showToast(`Moved previous voter (${voter.name}) to the ${nextColumn.label} column`, 'success');
+    if (!nextTargetColumn) return;
 
-    // Only the todo/writing stage auto-pulls in the next voter; later
-    // stages (stamping, mailing) just advance the current voter.
-    const isWritingStage =
-      !!firstColumn && !!secondColumn && (originalStatus === firstColumn.id || originalStatus === secondColumn.id);
+    moveVoter(voter.id, nextTargetColumn.id, null);
+    showToast(`Moved previous voter (${voter.name}) to the ${nextTargetColumn.label} column`, 'success');
 
-    const nextVoter =
-      isWritingStage && firstColumn
-        ? getVotersForProject(projectId)
-            .filter((v) => v.status === firstColumn.id && v.id !== voter.id)
-            .sort((a, b) => a.order - b.order)[0]
-        : undefined;
-
-    if (nextVoter && secondColumn) {
-      moveVoter(nextVoter.id, secondColumn.id, null);
+    if (pullCandidate && pullToColumn) {
+      moveVoter(pullCandidate.id, pullToColumn.id, null);
     }
 
     close();
     rerender();
 
-    if (nextVoter) {
-      const updatedNextVoter = getVotersForProject(projectId).find((v) => v.id === nextVoter.id);
+    if (pullCandidate) {
+      const updatedNextVoter = getVotersForProject(projectId).find((v) => v.id === pullCandidate.id);
       if (updatedNextVoter) openDetailView(updatedNextVoter, projectId, rerender);
     }
   }
