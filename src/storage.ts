@@ -49,8 +49,9 @@ function loadState(): StoredState {
         const isWritingStage = !!first && !!second && (col.id === first.id || col.id === second.id);
         col.automation = {
           onOpenMoveTo: first && second && col.id === first.id ? second.id : null,
-          doneMoveTo: second && third && col.id === second.id ? third.id : null,
+          doneMoveTo: isWritingStage && third ? third.id : null,
           nextVoterMoveTo: next ? next.id : null,
+          displayNextFrom: isWritingStage ? second.id : null,
           pullFrom: isWritingStage ? first.id : null,
           pullTo: isWritingStage ? second.id : null,
         };
@@ -207,7 +208,14 @@ export function addColumn(projectId: string, label: string): Column | null {
   const column: Column = {
     id: crypto.randomUUID(),
     label: label.trim(),
-    automation: { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null },
+    automation: {
+      onOpenMoveTo: null,
+      doneMoveTo: null,
+      nextVoterMoveTo: null,
+      displayNextFrom: null,
+      pullFrom: null,
+      pullTo: null,
+    },
   };
   state.columns[projectId] = [...columns, column];
   saveState(state);

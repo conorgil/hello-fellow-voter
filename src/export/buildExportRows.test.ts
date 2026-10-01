@@ -93,7 +93,14 @@ describe('summarizeByStatus', () => {
   });
 
   it('sorts and labels according to a custom, reordered column list', () => {
-    const noAutomation = { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null };
+    const noAutomation = {
+      onOpenMoveTo: null,
+      doneMoveTo: null,
+      nextVoterMoveTo: null,
+      displayNextFrom: null,
+      pullFrom: null,
+      pullTo: null,
+    };
     const customColumns = [
       { id: 'inbox', label: 'Inbox', automation: noAutomation },
       { id: 'drafting', label: 'Drafting', automation: noAutomation },

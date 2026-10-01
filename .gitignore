@@ -6,7 +6,7 @@ dist
 /test-results
 /playwright-report
 /playwright/.cache
-
+notes.txt
 
 # Contains real voter names/addresses; the vendor's terms restrict
 # retaining/sharing this data beyond mailing the postcards.

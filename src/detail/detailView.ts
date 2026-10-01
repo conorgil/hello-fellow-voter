@@ -205,8 +205,11 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   right.append(stamp, address);
   postcard.append(message, right);
 
-  const currentColumn = columns.find((c) => c.id === voter.status);
-  const automation = currentColumn?.automation;
+  // Governed by the column the voter was opened from, not where an onOpen bump
+  // may have just landed them — so a column's own Done/Next-voter settings
+  // apply to voters that started there, instead of being silently superseded
+  // by whatever they get auto-moved into.
+  const automation = openingColumn?.automation;
   const doneStaysInPlace = automation?.doneMoveTo === DONE_STAY;
   const doneTargetColumn =
     automation?.doneMoveTo && automation.doneMoveTo !== DONE_STAY
@@ -224,11 +227,23 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
           .filter((v) => v.status === pullFromColumn.id && v.id !== voter.id)
           .sort((a, b) => a.order - b.order)[0]
       : undefined;
-  // When the automation is configured to pull a new voter and that column has
-  // none left, the voter being viewed is already the last one — showing a
-  // "Next voter" button would just advance into an empty pull with nothing to
-  // open next, so hide it and leave only Done.
-  const pullQueueEmpty = !!pullFromColumn && !!pullToColumn && !pullCandidate;
+
+  const displayFromColumn = automation?.displayNextFrom ? columns.find((c) => c.id === automation.displayNextFrom) : undefined;
+  const existingDisplayCandidate = displayFromColumn
+    ? getVotersForProject(projectId)
+        .filter((v) => v.status === displayFromColumn.id && v.id !== voter.id)
+        .sort((a, b) => a.order - b.order)[0]
+    : undefined;
+  // If the move step is about to land a voter into the very column we're
+  // displaying from, and nobody's already waiting there, that pulled voter is
+  // who ends up shown next.
+  const displayCandidate =
+    existingDisplayCandidate ?? (pullToColumn?.id === displayFromColumn?.id ? pullCandidate : undefined);
+  // When the automation is configured to auto-display the next voter from a
+  // column and that column has nobody left, the voter being viewed is already
+  // the last one — showing a "Next voter" button would just advance into an
+  // empty queue with nothing to open next, so hide it and leave only Done.
+  const displayQueueEmpty = !!displayFromColumn && !displayCandidate;
 
   const footer = document.createElement('div');
   footer.className = 'detail-panel__footer';
@@ -252,13 +267,16 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     footer.append(doneBtn);
   }
 
-  if (nextTargetColumn && !pullQueueEmpty) {
+  if (nextTargetColumn && !displayQueueEmpty) {
     const advanceBtn = document.createElement('button');
     advanceBtn.className = 'btn btn--primary detail-panel__advance';
     advanceBtn.textContent = 'Next voter';
     let nextTooltip = `Moves ${voter.name} to ${nextTargetColumn.label}`;
     if (pullCandidate && pullFromColumn && pullToColumn) {
       nextTooltip += ` and ${pullCandidate.name} from ${pullFromColumn.label} to ${pullToColumn.label}`;
+    }
+    if (displayCandidate && displayFromColumn && displayCandidate.id !== pullCandidate?.id) {
+      nextTooltip += `, then shows ${displayCandidate.name} from ${displayFromColumn.label}`;
     }
     attachTextTooltip(advanceBtn, nextTooltip, 400, 'above');
     advanceBtn.addEventListener('click', goToNextVoter);
@@ -284,9 +302,11 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     close();
     rerender();
 
-    if (pullCandidate) {
-      const updatedNextVoter = getVotersForProject(projectId).find((v) => v.id === pullCandidate.id);
-      if (updatedNextVoter) openDetailView(updatedNextVoter, projectId, rerender);
+    if (displayFromColumn) {
+      const nextToShow = getVotersForProject(projectId)
+        .filter((v) => v.status === displayFromColumn.id && v.id !== voter.id)
+        .sort((a, b) => a.order - b.order)[0];
+      if (nextToShow) openDetailView(nextToShow, projectId, rerender);
     }
   }
 

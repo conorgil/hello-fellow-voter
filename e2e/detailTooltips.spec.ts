@@ -23,7 +23,7 @@ test('button tooltips describe what each button will do', async ({ page }) => {
 
   const doneBtn = page.getByRole('button', { name: 'Done', exact: true });
   await doneBtn.hover();
-  await expect(doneBtn.locator('.tooltip')).toHaveText('Moves First Voter to Written and closes address view');
+  await expect(doneBtn.locator('.tooltip')).toHaveText('Closes address view without moving First Voter');
 
   const nextBtn = page.getByRole('button', { name: 'Next voter' });
   await nextBtn.hover();
@@ -33,19 +33,9 @@ test('button tooltips describe what each button will do', async ({ page }) => {
 });
 
 test('Done tooltip reflects "(Do not move current voter)" when the voter stays in place', async ({ page }) => {
-  // Writing's own automation is left at its default; instead use a voter whose
-  // Done button is configured to stay in place via the automation form.
-  await page.locator('.dropdown button', { hasText: '⋯' }).nth(1).click();
-  await page.locator('.dropdown__menu').locator('visible=true').getByText('Edit automation', { exact: true }).click();
-  await page.waitForSelector('.automation-panel', { state: 'visible' });
-  const doneSelect = page
-    .locator('.automation-group', { hasText: 'When Done button is clicked' })
-    .locator('.automation-field', { hasText: 'Move the current voter to' })
-    .locator('select');
-  await doneSelect.selectOption({ label: '(Do not move current voter)' });
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.locator('.automation-panel')).toHaveCount(0);
-
+  // TODO's own automation defaults to "(Do not move current voter)" for Done —
+  // and since the button is governed by the column the voter was opened from,
+  // that setting applies even though opening the voter bumps it into Writing.
   await addVoter(page, { name: 'Jane Doe', street: '123 Main St', city: 'Springfield', state: 'IL', zip: '62704' });
   await page.locator('.voter-card', { hasText: 'Jane Doe' }).click();
   await page.waitForSelector('.detail-panel', { state: 'visible' });

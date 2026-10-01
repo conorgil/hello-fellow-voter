@@ -277,6 +277,7 @@ describe('addColumn', () => {
       onOpenMoveTo: null,
       doneMoveTo: null,
       nextVoterMoveTo: null,
+      displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
     });
@@ -291,6 +292,7 @@ describe('setColumnAutomation', () => {
       onOpenMoveTo: second.id,
       doneMoveTo: third.id,
       nextVoterMoveTo: second.id,
+      displayNextFrom: second.id,
       pullFrom: first.id,
       pullTo: second.id,
     };
@@ -304,6 +306,7 @@ describe('setColumnAutomation', () => {
       onOpenMoveTo: null,
       doneMoveTo: null,
       nextVoterMoveTo: null,
+      displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
     };
@@ -444,10 +447,10 @@ describe('column migration backfill', () => {
 
     const columns = getColumns('legacy-custom-project');
     expect(columns.map((c) => c.automation)).toEqual([
-      { onOpenMoveTo: 'b', doneMoveTo: null, nextVoterMoveTo: 'b', pullFrom: 'a', pullTo: 'b' },
-      { onOpenMoveTo: null, doneMoveTo: 'c', nextVoterMoveTo: 'c', pullFrom: 'a', pullTo: 'b' },
-      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: 'd', pullFrom: null, pullTo: null },
-      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null },
+      { onOpenMoveTo: 'b', doneMoveTo: 'c', nextVoterMoveTo: 'b', displayNextFrom: 'b', pullFrom: 'a', pullTo: 'b' },
+      { onOpenMoveTo: null, doneMoveTo: 'c', nextVoterMoveTo: 'c', displayNextFrom: 'b', pullFrom: 'a', pullTo: 'b' },
+      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: 'd', displayNextFrom: null, pullFrom: null, pullTo: null },
+      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, displayNextFrom: null, pullFrom: null, pullTo: null },
     ]);
   });
 });

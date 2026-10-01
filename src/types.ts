@@ -13,9 +13,14 @@ export interface ColumnAutomation {
   doneMoveTo: string | null;
   /** Column to move the current voter to when "Next voter" is clicked. Null = Next voter button disabled. */
   nextVoterMoveTo: string | null;
-  /** Column to pull the next queued voter from, paired with pullTo. Null = skip this step. */
+  /**
+   * Column to look in for the next voter to automatically open when "Next voter" is
+   * clicked — no voter is moved by this step. Null = don't auto-open anyone.
+   */
+  displayNextFrom: string | null;
+  /** Column to move a voter from, paired with pullTo. Null = skip this step. */
   pullFrom: string | null;
-  /** Column to move that pulled voter into, then open it. */
+  /** Column to move that voter into. */
   pullTo: string | null;
 }
 
@@ -33,6 +38,7 @@ export const DEFAULT_COLUMNS: Column[] = [
       onOpenMoveTo: 'writing',
       doneMoveTo: DONE_STAY,
       nextVoterMoveTo: 'written',
+      displayNextFrom: 'writing',
       pullFrom: 'todo',
       pullTo: 'writing',
     },
@@ -40,7 +46,14 @@ export const DEFAULT_COLUMNS: Column[] = [
   {
     id: 'writing',
     label: 'Writing',
-    automation: { onOpenMoveTo: null, doneMoveTo: 'written', nextVoterMoveTo: 'written', pullFrom: 'todo', pullTo: 'writing' },
+    automation: {
+      onOpenMoveTo: null,
+      doneMoveTo: 'written',
+      nextVoterMoveTo: 'written',
+      displayNextFrom: 'writing',
+      pullFrom: 'todo',
+      pullTo: 'writing',
+    },
   },
   {
     id: 'written',
@@ -49,19 +62,34 @@ export const DEFAULT_COLUMNS: Column[] = [
       onOpenMoveTo: null,
       doneMoveTo: 'stamped',
       nextVoterMoveTo: 'stamped',
-      pullFrom: 'written',
-      pullTo: 'stamped',
+      displayNextFrom: 'written',
+      pullFrom: null,
+      pullTo: null,
     },
   },
   {
     id: 'stamped',
     label: 'Stamp Applied',
-    automation: { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: 'mailed', pullFrom: null, pullTo: null },
+    automation: {
+      onOpenMoveTo: null,
+      doneMoveTo: null,
+      nextVoterMoveTo: 'mailed',
+      displayNextFrom: 'stamped',
+      pullFrom: null,
+      pullTo: null,
+    },
   },
   {
     id: 'mailed',
     label: 'Mailed',
-    automation: { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, pullFrom: null, pullTo: null },
+    automation: {
+      onOpenMoveTo: null,
+      doneMoveTo: null,
+      nextVoterMoveTo: null,
+      displayNextFrom: null,
+      pullFrom: null,
+      pullTo: null,
+    },
   },
 ];
 

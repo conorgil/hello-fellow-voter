@@ -136,8 +136,11 @@ export function openColumnAutomationForm(projectId: string, column: Column, rere
   const nextMoveSelect = buildColumnSelect("(Don't show a Next voter button)", automation.nextVoterMoveTo);
   const nextMoveField = buildField(['Move the current voter to'], nextMoveSelect);
 
-  const pullFromSelect = buildColumnSelect("(Don't pull another voter)", automation.pullFrom);
-  const pullFromField = buildField(['Move a new voter from'], pullFromSelect);
+  const displaySelect = buildColumnSelect("(Don't automatically display a voter)", automation.displayNextFrom);
+  const displayField = buildField(['Display next voter in'], displaySelect);
+
+  const pullFromSelect = buildColumnSelect("(Don't move another voter)", automation.pullFrom);
+  const pullFromField = buildField(['Move voter from'], pullFromSelect);
 
   const pullToSelect = buildColumnSelect(null, automation.pullTo ?? columns[0]?.id ?? null);
   const pullToField = buildField(['into'], pullToSelect);
@@ -148,7 +151,7 @@ export function openColumnAutomationForm(projectId: string, column: Column, rere
 
   const nextGroup = buildGroup(
     ['When ', bold('Next voter'), ' button is clicked'],
-    buildActionList([nextMoveField, pullAction]),
+    buildActionList([nextMoveField, pullAction, displayField]),
   );
 
   function syncPullToVisible(): void {
@@ -201,6 +204,7 @@ export function openColumnAutomationForm(projectId: string, column: Column, rere
       onOpenMoveTo: onOpenSelect.value || null,
       doneMoveTo: doneSelect.value || null,
       nextVoterMoveTo: nextMoveSelect.value || null,
+      displayNextFrom: displaySelect.value || null,
       pullFrom: pullFromSelect.value || null,
       pullTo: pullFromSelect.value ? pullToSelect.value || null : null,
     };

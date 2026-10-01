@@ -14,16 +14,31 @@ test('title names the column being customized', async ({ page }) => {
 test('hides the "into" field when "pull from" is set to none', async ({ page }) => {
   await openAutomationForm(page, 0);
 
-  const pullFromSelect = automationSelect(page, 'When Next voter button is clicked', 'Move a new voter from');
+  const pullFromSelect = automationSelect(page, 'When Next voter button is clicked', 'Move voter from');
   const intoField = page.locator('.automation-field', { hasText: 'into' });
 
   await expect(intoField).toBeVisible();
 
-  await pullFromSelect.selectOption({ label: "(Don't pull another voter)" });
+  await pullFromSelect.selectOption({ label: "(Don't move another voter)" });
   await expect(intoField).toBeHidden();
 
   await pullFromSelect.selectOption({ label: 'TODO' });
   await expect(intoField).toBeVisible();
+});
+
+test('saves the "Display next voter in" setting and reflects it on reopen', async ({ page }) => {
+  await openAutomationForm(page, 2); // Written column
+
+  const displaySelect = automationSelect(page, 'When Next voter button is clicked', 'Display next voter in');
+  await expect(displaySelect).toHaveValue('written');
+  await displaySelect.selectOption({ label: "(Don't automatically display a voter)" });
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('.automation-panel')).toHaveCount(0);
+
+  await openAutomationForm(page, 2);
+  await expect(
+    automationSelect(page, 'When Next voter button is clicked', 'Display next voter in'),
+  ).toHaveValue('');
 });
 
 test('saves automation settings and reflects them on reopen', async ({ page }) => {
