@@ -71,6 +71,13 @@ button {
 .btn--secondary:hover {
   background: #f0f1f3;
 }
+.btn--secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn--secondary:disabled:hover {
+  background: white;
+}
 
 .btn--danger {
   background: white;
@@ -208,6 +215,18 @@ button {
 .board-header__controls {
   display: flex;
   gap: 0.5rem;
+}
+
+.board-header__history-btn {
+  position: relative;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .board {

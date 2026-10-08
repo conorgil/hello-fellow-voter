@@ -4,19 +4,25 @@ import { openVoterForm } from '../forms/voterForm';
 import { openPasteImportForm } from '../forms/pasteImportForm';
 import { openPdfImportForm } from '../forms/pdfImportForm';
 import { openReviewSuspectsForm } from '../forms/reviewSuspectsForm';
+import { redoShortcutLabel, undoShortcutLabel } from '../keyboardShortcuts';
 import { createHelpButton } from '../splash/helpButton';
 import {
   addColumn,
+  canRedo,
+  canUndo,
   deleteColumn,
   getColumns,
   getVotersForProject,
   getSuspectQueue,
+  redo,
   renameColumn,
   renameProject,
   setActiveProject,
+  undo,
 } from '../storage';
 import type { Project } from '../types';
 import { createDropdownButton } from '../ui/dropdownMenu';
+import { attachTextTooltip } from '../ui/tooltip';
 import { createVoterElement } from './voter';
 import { makeBoardColumnDroppable, makeColumnDraggable, makeColumnDroppable } from './dragDrop';
 import { clearSelection, isSelected, toggleSelectAllInColumn } from './selection';
@@ -108,6 +114,34 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
 
   const controls = document.createElement('div');
   controls.className = 'board-header__controls';
+
+  const undoBtn = document.createElement('button');
+  undoBtn.className = 'btn btn--secondary board-header__history-btn';
+  undoBtn.setAttribute('aria-label', 'Undo');
+  undoBtn.textContent = '↺';
+  undoBtn.disabled = !canUndo();
+  attachTextTooltip(undoBtn, `Undo (${undoShortcutLabel()})`, 400);
+  undoBtn.addEventListener('click', () => {
+    if (undo()) {
+      clearSelection();
+      rerender();
+    }
+  });
+
+  const redoBtn = document.createElement('button');
+  redoBtn.className = 'btn btn--secondary board-header__history-btn';
+  redoBtn.setAttribute('aria-label', 'Redo');
+  redoBtn.textContent = '↻';
+  redoBtn.disabled = !canRedo();
+  attachTextTooltip(redoBtn, `Redo (${redoShortcutLabel()})`, 400);
+  redoBtn.addEventListener('click', () => {
+    if (redo()) {
+      clearSelection();
+      rerender();
+    }
+  });
+
+  controls.append(undoBtn, redoBtn);
 
   const importBtn = createDropdownButton(
     'Import voter list...',

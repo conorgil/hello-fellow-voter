@@ -8,3 +8,16 @@ export function isRedoShortcut(e: KeyboardEvent): boolean {
   const key = e.key.toLowerCase();
   return (hasModifier && e.shiftKey && key === 'z') || (e.ctrlKey && key === 'y');
 }
+
+function isMac(): boolean {
+  const platform = navigator.platform || navigator.userAgent || '';
+  return /mac/i.test(platform);
+}
+
+export function undoShortcutLabel(): string {
+  return isMac() ? '⌘Z' : 'Ctrl+Z';
+}
+
+export function redoShortcutLabel(): string {
+  return isMac() ? '⇧⌘Z' : 'Ctrl+Y';
+}

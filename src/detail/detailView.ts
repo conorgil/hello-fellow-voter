@@ -3,6 +3,7 @@ import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
 import { getColumns, getProjectMessage, getVotersForProject, moveVoter, setProjectMessage } from '../storage';
 import { DONE_STAY, type Voter } from '../types';
 import { showToast } from '../ui/toast';
+import { attachTextTooltip, attachTooltip } from '../ui/tooltip';
 
 /**
  * Shrinks every line to the same font size — the smallest size that keeps the
@@ -21,39 +22,6 @@ function shrinkLinesToFit(lines: HTMLElement[]): void {
   for (const line of lines) {
     line.style.fontSize = fittedFontSize;
   }
-}
-
-function attachTooltipElement(el: HTMLElement, tooltip: HTMLElement, delayMs: number, placement: 'below' | 'above'): void {
-  tooltip.className = placement === 'above' ? 'tooltip tooltip--above' : 'tooltip';
-  tooltip.hidden = true;
-  el.appendChild(tooltip);
-
-  let timer: ReturnType<typeof setTimeout> | undefined;
-
-  el.addEventListener('mouseenter', () => {
-    timer = setTimeout(() => {
-      tooltip.hidden = false;
-    }, delayMs);
-  });
-
-  el.addEventListener('mouseleave', () => {
-    clearTimeout(timer);
-    tooltip.hidden = true;
-  });
-}
-
-function attachTooltip(el: HTMLElement, html: string, ariaLabel: string, delayMs: number): void {
-  el.setAttribute('aria-label', ariaLabel);
-  const tooltip = document.createElement('div');
-  tooltip.innerHTML = html;
-  attachTooltipElement(el, tooltip, delayMs, 'below');
-}
-
-/** Like `attachTooltip`, but for a button that already has its own visible label/aria-label — leaves it untouched. */
-function attachTextTooltip(el: HTMLElement, text: string, delayMs: number, placement: 'below' | 'above' = 'below'): void {
-  const tooltip = document.createElement('div');
-  tooltip.textContent = text;
-  attachTooltipElement(el, tooltip, delayMs, placement);
 }
 
 export function openDetailView(voter: Voter, projectId: string, rerender: () => void): void {
