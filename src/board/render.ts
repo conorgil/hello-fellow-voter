@@ -20,6 +20,7 @@ import {
   removeLabelFromVoters,
   renameColumn,
   renameProject,
+  reorderColumns,
   setActiveProject,
   undo,
 } from '../storage';
@@ -29,7 +30,8 @@ import { createLabelPicker } from '../ui/labelPicker';
 import { attachTextTooltip } from '../ui/tooltip';
 import { showToast } from '../ui/toast';
 import { createVoterElement } from './voter';
-import { makeBoardColumnDroppable, makeColumnDraggable, makeColumnDroppable } from './dragDrop';
+import { makeColumnDroppable } from './dragDrop';
+import { dragAndDrop } from '@formkit/drag-and-drop';
 import { clearLabelFilter, getActiveLabelFilters, pruneLabelFilters } from './labelFilter';
 import { clearSelection, getSelectedCount, getSelectedIds, isSelected, toggleSelectAllInColumn } from './selection';
 
@@ -44,8 +46,15 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
   header.className = 'board-header';
 
   const backLink = document.createElement('button');
-  backLink.className = 'btn btn--link';
-  backLink.textContent = '← All projects';
+  backLink.className = 'btn btn--link board-header__back';
+  backLink.setAttribute('aria-label', 'All projects');
+  const backArrow = document.createElement('span');
+  backArrow.setAttribute('aria-hidden', 'true');
+  backArrow.textContent = '←';
+  const backText = document.createElement('span');
+  backText.className = 'board-header__back-text';
+  backText.textContent = 'All projects';
+  backLink.append(backArrow, backText);
   backLink.addEventListener('click', () => {
     setActiveProject(null);
     clearSelection();
@@ -156,7 +165,38 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
     }
   });
 
-  controls.append(undoBtn, redoBtn);
+  // On desktop .board-header__actions is always visible (an inline row); on
+  // mobile it's a collapsed dropdown shown only via --open, toggled by
+  // menuToggleBtn (itself only visible on mobile). Using a modifier class
+  // rather than the `hidden` attribute keeps those two states independent
+  // instead of a single toggle fighting both breakpoints.
+  const actions = document.createElement('div');
+  actions.className = 'board-header__actions';
+
+  const menuToggleBtn = document.createElement('button');
+  menuToggleBtn.className = 'btn btn--secondary board-header__menu-toggle';
+  menuToggleBtn.setAttribute('aria-label', 'More actions');
+  menuToggleBtn.setAttribute('aria-expanded', 'false');
+  menuToggleBtn.textContent = '≡';
+  menuToggleBtn.addEventListener('click', () => {
+    actions.classList.contains('board-header__actions--open') ? closeActions() : openActions();
+  });
+
+  function openActions(): void {
+    actions.classList.add('board-header__actions--open');
+    menuToggleBtn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('click', onOutsideClick);
+  }
+  function closeActions(): void {
+    actions.classList.remove('board-header__actions--open');
+    menuToggleBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onOutsideClick);
+  }
+  function onOutsideClick(e: MouseEvent): void {
+    if (!controls.contains(e.target as Node)) closeActions();
+  }
+
+  controls.append(undoBtn, redoBtn, menuToggleBtn, actions);
 
   const importBtn = createDropdownButton(
     'Import voter list...',
@@ -180,7 +220,7 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
     exportVoterStatusPdf(project, getVotersForProject(project.id));
   });
 
-  controls.append(importBtn, addVoterBtn, exportBtn);
+  actions.append(importBtn, addVoterBtn, exportBtn);
 
   const labels = getLabels(project.id);
   pruneLabelFilters(labels.map((l) => l.id));
@@ -192,10 +232,10 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
     reviewSuspectsBtn.className = 'btn btn--secondary';
     reviewSuspectsBtn.textContent = `Review possible addresses (${pendingSuspects.length})`;
     reviewSuspectsBtn.addEventListener('click', () => openReviewSuspectsForm(project.id, rerender));
-    controls.append(reviewSuspectsBtn);
+    actions.append(reviewSuspectsBtn);
   }
 
-  controls.append(createHelpButton());
+  actions.append(createHelpButton());
   header.append(backLink, titleWrap, controls);
 
   const voters = getVotersForProject(project.id);
@@ -411,7 +451,6 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
     }
 
     makeColumnDroppable(columnBody, column.id, rerender);
-    makeColumnDraggable(dragHandle, columnEl, column.id, rerender);
 
     columnEl.append(columnHeader, columnBody);
     board.appendChild(columnEl);
@@ -475,7 +514,21 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
   showAddColumnButton();
   board.appendChild(addColumnEl);
 
-  makeBoardColumnDroppable(board, project.id);
+  dragAndDrop<string>({
+    parent: board,
+    getValues: () => getColumns(project.id).map((c) => c.id),
+    setValues: (newOrder) => {
+      reorderColumns(project.id, newOrder);
+      rerender();
+    },
+    config: {
+      dragHandle: '.column__drag-handle',
+      draggable: (el) => !el.classList.contains('column--add'),
+      longPress: true,
+      longPressDuration: 450,
+      draggingClass: 'column--dragging',
+    },
+  });
 
   if (batchBar) {
     wrapper.append(header, batchBar, board);

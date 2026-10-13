@@ -35,6 +35,10 @@ function shrinkLinesToFit(lines: HTMLElement[]): void {
 }
 
 export function openDetailView(voter: Voter, projectId: string, rerender: () => void): void {
+  // Lets mobile-portrait CSS rotate toasts to match the detail view's own forced-landscape
+  // rotation (see .overlay--detail), rather than having them land right-side-up on top of it.
+  document.body.classList.add('detail-view-open');
+
   const columns = getColumns(projectId);
   const openingColumn = columns.find((c) => c.id === voter.status);
   const onOpenTargetColumn = openingColumn?.automation.onOpenMoveTo
@@ -363,6 +367,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
 
   function close(): void {
     overlay.remove();
+    document.body.classList.remove('detail-view-open');
     document.removeEventListener('keydown', onKeydown);
   }
 

@@ -9,7 +9,8 @@
       /* Critical CSS for .gh-corner below: this markup renders before
          style.css (loaded via JS import) reaches the page in dev mode,
          so it needs its own styling to avoid a flash of a huge, unpositioned
-         icon. Keep this in sync with --gh-corner-size in src/style.css. */
+         icon. Keep this in sync with --gh-corner-size and the mobile
+         hide-the-ribbon rule in src/style.css. */
       .gh-corner {
         position: fixed;
         top: 0;
@@ -35,6 +36,11 @@
         width: 30px;
         height: 30px;
         display: block;
+      }
+      @media (max-width: 640px), (max-height: 640px) {
+        .gh-corner {
+          display: none;
+        }
       }
     </style>
   </head>
