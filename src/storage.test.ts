@@ -1,28 +1,37 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addColumn,
+  addLabelToVoters,
   addVoter,
   addToSuspectQueue,
   canRedo,
   canUndo,
+  createLabel,
   createProject,
   dedupeKey,
   deleteColumn,
+  deleteLabel,
+  deleteProject,
   deleteVoter,
   getColumns,
+  getLabels,
   getProjectMessage,
   getVotersForProject,
   getSuspectQueue,
   moveVoter,
+  moveVoters,
   normalize,
   redo,
   removeFromSuspectQueue,
+  removeLabelFromVoters,
   renameColumn,
   renameProject,
   reorderColumns,
   setColumnAutomation,
   setProjectMessage,
+  toggleVoterLabel,
   undo,
+  updateLabel,
 } from './storage';
 import { DEFAULT_COLUMNS, type Project } from './types';
 
@@ -280,6 +289,7 @@ describe('addColumn', () => {
       displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     });
   });
 });
@@ -295,6 +305,7 @@ describe('setColumnAutomation', () => {
       displayNextFrom: second.id,
       pullFrom: first.id,
       pullTo: second.id,
+      assignLabelOnEntry: null,
     };
     expect(setColumnAutomation(project.id, first.id, automation)).toBe(true);
     expect(getColumns(project.id).find((c) => c.id === first.id)?.automation).toEqual(automation);
@@ -309,6 +320,7 @@ describe('setColumnAutomation', () => {
       displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     };
     expect(setColumnAutomation(project.id, 'not-a-real-id', automation)).toBe(false);
   });
@@ -447,11 +459,73 @@ describe('column migration backfill', () => {
 
     const columns = getColumns('legacy-custom-project');
     expect(columns.map((c) => c.automation)).toEqual([
-      { onOpenMoveTo: 'b', doneMoveTo: 'c', nextVoterMoveTo: 'b', displayNextFrom: 'b', pullFrom: 'a', pullTo: 'b' },
-      { onOpenMoveTo: null, doneMoveTo: 'c', nextVoterMoveTo: 'c', displayNextFrom: 'b', pullFrom: 'a', pullTo: 'b' },
-      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: 'd', displayNextFrom: null, pullFrom: null, pullTo: null },
-      { onOpenMoveTo: null, doneMoveTo: null, nextVoterMoveTo: null, displayNextFrom: null, pullFrom: null, pullTo: null },
+      {
+        onOpenMoveTo: 'b',
+        doneMoveTo: 'c',
+        nextVoterMoveTo: 'b',
+        displayNextFrom: 'b',
+        pullFrom: 'a',
+        pullTo: 'b',
+        assignLabelOnEntry: null,
+      },
+      {
+        onOpenMoveTo: null,
+        doneMoveTo: 'c',
+        nextVoterMoveTo: 'c',
+        displayNextFrom: 'b',
+        pullFrom: 'a',
+        pullTo: 'b',
+        assignLabelOnEntry: null,
+      },
+      {
+        onOpenMoveTo: null,
+        doneMoveTo: null,
+        nextVoterMoveTo: 'd',
+        displayNextFrom: null,
+        pullFrom: null,
+        pullTo: null,
+        assignLabelOnEntry: null,
+      },
+      {
+        onOpenMoveTo: null,
+        doneMoveTo: null,
+        nextVoterMoveTo: null,
+        displayNextFrom: null,
+        pullFrom: null,
+        pullTo: null,
+        assignLabelOnEntry: null,
+      },
     ]);
+  });
+
+  it('backfills assignLabelOnEntry for a column whose automation object predates label support', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-label-project', name: 'Legacy Label Project', createdAt: '2025-01-01T00:00:00.000Z' }],
+      activeProjectId: 'legacy-label-project',
+      voters: [],
+      suspectQueues: {},
+      columns: {
+        'legacy-label-project': [
+          {
+            id: 'a',
+            label: 'Alpha',
+            automation: {
+              onOpenMoveTo: null,
+              doneMoveTo: null,
+              nextVoterMoveTo: null,
+              displayNextFrom: null,
+              pullFrom: null,
+              pullTo: null,
+            },
+          },
+        ],
+      },
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    const columns = getColumns('legacy-label-project');
+    expect(columns[0].automation.assignLabelOnEntry).toBeNull();
   });
 });
 
@@ -467,5 +541,177 @@ describe('message migration backfill', () => {
     localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
 
     expect(getProjectMessage('legacy-project')).toBe('');
+  });
+});
+
+describe('labels migration backfill', () => {
+  it('backfills an empty labels list and empty voter labelIds for pre-existing projects', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-project', name: 'Legacy Project', createdAt: '2025-01-01T00:00:00.000Z', message: '' }],
+      activeProjectId: 'legacy-project',
+      voters: [
+        {
+          id: 'legacy-voter',
+          projectId: 'legacy-project',
+          name: 'Legacy Voter',
+          street: '1 Legacy St',
+          city: 'X',
+          state: 'NY',
+          zip: '10001',
+          status: 'todo',
+          order: 0,
+          createdAt: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    expect(getLabels('legacy-project')).toEqual([]);
+    expect(getVotersForProject('legacy-project')[0].labelIds).toEqual([]);
+  });
+});
+
+describe('labels CRUD', () => {
+  it('creates, lists, and rejects a duplicate (case-insensitive) label name', () => {
+    const project = mustCreateProject('Labels Project');
+    const label = createLabel(project.id, 'Batch 1', '#ff0000');
+    expect(label).not.toBeNull();
+    expect(getLabels(project.id)).toEqual([label]);
+    expect(createLabel(project.id, '  batch 1  ', '#00ff00')).toBeNull();
+  });
+
+  it('updates a label name and color, rejecting a name collision with another label', () => {
+    const project = mustCreateProject('Update Label Project');
+    const a = createLabel(project.id, 'Batch 1', '#ff0000')!;
+    const b = createLabel(project.id, 'Batch 2', '#00ff00')!;
+    expect(updateLabel(project.id, a.id, 'Batch One', '#0000ff')).toBe(true);
+    expect(getLabels(project.id).find((l) => l.id === a.id)).toEqual({ id: a.id, name: 'Batch One', color: '#0000ff' });
+    expect(updateLabel(project.id, a.id, 'Batch 2', '#0000ff')).toBe(false);
+    expect(b).toBeTruthy();
+  });
+
+  it('deletes a label, stripping it from voters and nulling any automation pointing at it', () => {
+    const project = mustCreateProject('Delete Label Project');
+    const label = createLabel(project.id, 'Batch 1', '#ff0000')!;
+    const voter = addVoter(project.id, { name: 'V', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    toggleVoterLabel(voter.id, label.id);
+    const [firstColumn] = getColumns(project.id);
+    setColumnAutomation(project.id, firstColumn.id, { ...firstColumn.automation, assignLabelOnEntry: label.id });
+
+    deleteLabel(project.id, label.id);
+
+    expect(getLabels(project.id)).toEqual([]);
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([]);
+    expect(getColumns(project.id).find((c) => c.id === firstColumn.id)?.automation.assignLabelOnEntry).toBeNull();
+  });
+
+  it('cleans up a project labels when the project is deleted', () => {
+    const project = mustCreateProject('Delete Project Labels Project');
+    createLabel(project.id, 'Batch 1', '#ff0000');
+    deleteProject(project.id);
+    expect(getLabels(project.id)).toEqual([]);
+  });
+});
+
+describe('voter label assignment', () => {
+  it('toggles a single label on and off', () => {
+    const project = mustCreateProject('Toggle Label Project');
+    const label = createLabel(project.id, 'Batch 1', '#ff0000')!;
+    const voter = addVoter(project.id, { name: 'V', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+
+    toggleVoterLabel(voter.id, label.id);
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([label.id]);
+
+    toggleVoterLabel(voter.id, label.id);
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([]);
+  });
+
+  it('adds a label to multiple voters idempotently, leaving other voters untouched', () => {
+    const project = mustCreateProject('Batch Add Label Project');
+    const label = createLabel(project.id, 'Batch 1', '#ff0000')!;
+    const v1 = addVoter(project.id, { name: 'V1', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    const v2 = addVoter(project.id, { name: 'V2', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    const v3 = addVoter(project.id, { name: 'V3', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    toggleVoterLabel(v1.id, label.id);
+
+    addLabelToVoters([v1.id, v2.id], label.id);
+
+    const voters = getVotersForProject(project.id);
+    expect(voters.find((v) => v.id === v1.id)?.labelIds).toEqual([label.id]);
+    expect(voters.find((v) => v.id === v2.id)?.labelIds).toEqual([label.id]);
+    expect(voters.find((v) => v.id === v3.id)?.labelIds).toEqual([]);
+  });
+
+  it('removes a label from multiple voters, leaving other voters untouched', () => {
+    const project = mustCreateProject('Batch Remove Label Project');
+    const label = createLabel(project.id, 'Batch 1', '#ff0000')!;
+    const v1 = addVoter(project.id, { name: 'V1', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    const v2 = addVoter(project.id, { name: 'V2', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    addLabelToVoters([v1.id, v2.id], label.id);
+
+    removeLabelFromVoters([v1.id], label.id);
+
+    const voters = getVotersForProject(project.id);
+    expect(voters.find((v) => v.id === v1.id)?.labelIds).toEqual([]);
+    expect(voters.find((v) => v.id === v2.id)?.labelIds).toEqual([label.id]);
+  });
+});
+
+describe('column automation: assign label on entry', () => {
+  it('assigns a label when a voter moves into a column via moveVoter, without duplicating on repeat entry', () => {
+    const project = mustCreateProject('Auto Label Move Project');
+    const label = createLabel(project.id, 'Mailed Batch 1', '#ff0000')!;
+    const [first, second] = getColumns(project.id);
+    setColumnAutomation(project.id, second.id, { ...second.automation, assignLabelOnEntry: label.id });
+    const voter = addVoter(project.id, { name: 'V', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+
+    moveVoter(voter.id, second.id, null);
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([label.id]);
+
+    moveVoter(voter.id, first.id, null);
+    moveVoter(voter.id, second.id, null);
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([label.id]);
+  });
+
+  it('assigns a label to a batch of voters moved via moveVoters', () => {
+    const project = mustCreateProject('Auto Label Batch Move Project');
+    const label = createLabel(project.id, 'Mailed Batch 1', '#ff0000')!;
+    const [, second] = getColumns(project.id);
+    setColumnAutomation(project.id, second.id, { ...second.automation, assignLabelOnEntry: label.id });
+    const v1 = addVoter(project.id, { name: 'V1', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    const v2 = addVoter(project.id, { name: 'V2', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+
+    moveVoters([v1.id, v2.id], second.id);
+
+    const voters = getVotersForProject(project.id);
+    expect(voters.find((v) => v.id === v1.id)?.labelIds).toEqual([label.id]);
+    expect(voters.find((v) => v.id === v2.id)?.labelIds).toEqual([label.id]);
+  });
+
+  it('never removes a label a voter already has when moving into a column with no automation', () => {
+    const project = mustCreateProject('No Automation Keeps Label Project');
+    const label = createLabel(project.id, 'Manual Label', '#ff0000')!;
+    const [first, second] = getColumns(project.id);
+    const voter = addVoter(project.id, { name: 'V', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+    toggleVoterLabel(voter.id, label.id);
+
+    moveVoter(voter.id, second.id, null);
+
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([label.id]);
+    expect(first).toBeTruthy();
+  });
+
+  it('silently no-ops if the automation points at a label that was since deleted', () => {
+    const project = mustCreateProject('Deleted Label Automation Project');
+    const label = createLabel(project.id, 'Gone Soon', '#ff0000')!;
+    const [, second] = getColumns(project.id);
+    setColumnAutomation(project.id, second.id, { ...second.automation, assignLabelOnEntry: label.id });
+    deleteLabel(project.id, label.id);
+    const voter = addVoter(project.id, { name: 'V', street: 'S', city: 'C', state: 'ST', zip: '00000' });
+
+    expect(() => moveVoter(voter.id, second.id, null)).not.toThrow();
+    expect(getVotersForProject(project.id)[0].labelIds).toEqual([]);
   });
 });

@@ -49,6 +49,7 @@ export function importRecords(
       status: firstColumnId,
       order: nextOrder++,
       createdAt: new Date().toISOString(),
+      labelIds: [],
     });
     imported++;
   }

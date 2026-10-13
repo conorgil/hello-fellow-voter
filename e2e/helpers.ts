@@ -38,6 +38,25 @@ export function automationSelect(page: Page, groupLegend: string, fieldLabel: st
   return group.locator('.automation-field', { hasText: fieldLabel }).locator('select');
 }
 
+/** Assumes a voter's detail view is already open — reaches the manager via the label picker's "Edit labels" link. */
+export async function openLabelManager(page: Page): Promise<void> {
+  await page.locator('.detail-panel__labels button', { hasText: '+ Label' }).click();
+  await page.locator('.label-picker__footer button', { hasText: 'Edit labels' }).click();
+  await page.waitForSelector('.label-manager-panel', { state: 'visible' });
+}
+
+export async function openVoterDetail(page: Page, nameText: string): Promise<void> {
+  await page.locator('.voter-card', { hasText: nameText }).click();
+  await page.waitForSelector('.detail-panel', { state: 'visible' });
+}
+
+export async function createLabel(page: Page, name: string): Promise<void> {
+  await page.getByRole('button', { name: '+ New label' }).click();
+  await page.locator('.label-manager__add-form input[type="text"]').fill(name);
+  await page.locator('.label-manager__add-form .color-swatch').first().click();
+  await page.locator('.label-manager__add-form button[type="submit"]').click();
+}
+
 export async function addVoter(
   page: Page,
   voter: { name: string; street: string; city: string; state: string; zip: string },

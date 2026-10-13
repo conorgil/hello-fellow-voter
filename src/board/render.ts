@@ -8,13 +8,16 @@ import { redoShortcutLabel, undoShortcutLabel } from '../keyboardShortcuts';
 import { createHelpButton } from '../splash/helpButton';
 import {
   addColumn,
+  addLabelToVoters,
   canRedo,
   canUndo,
   deleteColumn,
   getColumns,
+  getLabels,
   getVotersForProject,
   getSuspectQueue,
   redo,
+  removeLabelFromVoters,
   renameColumn,
   renameProject,
   setActiveProject,
@@ -22,10 +25,15 @@ import {
 } from '../storage';
 import type { Project } from '../types';
 import { createDropdownButton } from '../ui/dropdownMenu';
+import { createLabelPicker } from '../ui/labelPicker';
 import { attachTextTooltip } from '../ui/tooltip';
+import { showToast } from '../ui/toast';
 import { createVoterElement } from './voter';
 import { makeBoardColumnDroppable, makeColumnDraggable, makeColumnDroppable } from './dragDrop';
-import { clearSelection, isSelected, toggleSelectAllInColumn } from './selection';
+import { clearLabelFilter, getActiveLabelFilters, pruneLabelFilters } from './labelFilter';
+import { clearSelection, getSelectedCount, getSelectedIds, isSelected, toggleSelectAllInColumn } from './selection';
+
+let batchPickerOpen = false;
 
 export function renderBoardView(container: HTMLElement, project: Project, rerender: () => void): void {
   const wrapper = document.createElement('div');
@@ -41,6 +49,7 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
   backLink.addEventListener('click', () => {
     setActiveProject(null);
     clearSelection();
+    clearLabelFilter();
     rerender();
   });
 
@@ -51,8 +60,14 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'board-header__title board-header__title--editable';
-    button.textContent = project.name;
     button.setAttribute('aria-label', 'Rename project');
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'board-header__title-label';
+    labelSpan.textContent = project.name;
+    button.appendChild(labelSpan);
+
+    attachTextTooltip(button, 'Project name. Click to change.', 400, 'below', 'left');
     button.addEventListener('click', showTitleEditor);
     titleWrap.replaceChildren(button);
   }
@@ -158,13 +173,18 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
   addVoterBtn.addEventListener('click', () => openVoterForm(project.id, rerender));
 
   const exportBtn = document.createElement('button');
-  exportBtn.className = 'btn btn--secondary';
+  exportBtn.className = 'btn btn--secondary board-header__export-btn';
   exportBtn.textContent = 'Export voter list';
+  attachTextTooltip(exportBtn, 'Export a PDF that contains each voter and their current status', 400);
   exportBtn.addEventListener('click', () => {
     exportVoterStatusPdf(project, getVotersForProject(project.id));
   });
 
   controls.append(importBtn, addVoterBtn, exportBtn);
+
+  const labels = getLabels(project.id);
+  pruneLabelFilters(labels.map((l) => l.id));
+  const activeLabelFilters = getActiveLabelFilters();
 
   const pendingSuspects = getSuspectQueue(project.id);
   if (pendingSuspects.length > 0) {
@@ -178,19 +198,71 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
   controls.append(createHelpButton());
   header.append(backLink, titleWrap, controls);
 
+  const voters = getVotersForProject(project.id);
+  const columns = getColumns(project.id);
+
+  // --- Batch label toolbar ---
+  const selectedCount = getSelectedCount();
+  let batchBar: HTMLElement | null = null;
+  if (selectedCount > 0 && labels.length > 0) {
+    batchBar = document.createElement('div');
+    batchBar.className = 'board-batch-bar';
+
+    const countText = document.createElement('span');
+    countText.textContent = `${selectedCount} selected`;
+    batchBar.appendChild(countText);
+
+    const selectedIds = getSelectedIds();
+    const batchPicker = createLabelPicker(
+      'Add/remove labels',
+      project.id,
+      (id) => selectedIds.every((voterId) => voters.find((v) => v.id === voterId)?.labelIds.includes(id)),
+      (id) => {
+        const allHaveIt = selectedIds.every((voterId) => voters.find((v) => v.id === voterId)?.labelIds.includes(id));
+        const label = getLabels(project.id).find((l) => l.id === id);
+        if (allHaveIt) {
+          removeLabelFromVoters(selectedIds, id);
+          if (label) showToast(`Removed "${label.name}" from ${selectedIds.length} voters`, 'success');
+        } else {
+          addLabelToVoters(selectedIds, id);
+          if (label) showToast(`Labeled ${selectedIds.length} voters as "${label.name}"`, 'success');
+        }
+        rerender();
+      },
+      rerender,
+      {
+        startOpen: batchPickerOpen,
+        onOpenChange: (open) => {
+          batchPickerOpen = open;
+        },
+        panelTitle: `Apply labels to ${selectedCount} voter(s)`,
+      },
+    );
+    batchBar.appendChild(batchPicker);
+
+    const clearSelectionBtn = document.createElement('button');
+    clearSelectionBtn.className = 'btn btn--link';
+    clearSelectionBtn.textContent = 'Clear selection';
+    clearSelectionBtn.addEventListener('click', () => {
+      clearSelection();
+      rerender();
+    });
+    batchBar.appendChild(clearSelectionBtn);
+  }
+
   // --- Columns ---
   const board = document.createElement('div');
   board.className = 'board';
 
-  const voters = getVotersForProject(project.id);
-  const columns = getColumns(project.id);
-
-  for (const column of columns) {
+  for (const [columnIndex, column] of columns.entries()) {
     const columnEl = document.createElement('section');
     columnEl.className = 'column';
     columnEl.dataset.columnId = column.id;
 
-    const columnVoters = voters.filter((v) => v.status === column.id).sort((a, b) => a.order - b.order);
+    const columnVoters = voters
+      .filter((v) => v.status === column.id)
+      .filter((v) => activeLabelFilters.length === 0 || v.labelIds.some((id) => activeLabelFilters.includes(id)))
+      .sort((a, b) => a.order - b.order);
     const columnVoterIds = columnVoters.map((v) => v.id);
     const selectedInColumn = columnVoterIds.filter((id) => isSelected(id)).length;
 
@@ -233,6 +305,14 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
       countSpan.textContent = String(columnVoters.length);
 
       button.append(labelSpan, countSpan);
+      const voterWord = columnVoters.length === 1 ? 'voter' : 'voters';
+      attachTextTooltip(
+        button,
+        `${columnVoters.length} ${voterWord} with status ${column.label}. Click to change column name.`,
+        400,
+        'below',
+        columnIndex === 0 ? 'left' : 'right',
+      );
       titleWrap.replaceChildren(button);
     }
 
@@ -327,7 +407,7 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
     columnBody.className = 'column__body';
 
     for (const voter of columnVoters) {
-      columnBody.appendChild(createVoterElement(voter, project.id, columnVoterIds, columns, rerender));
+      columnBody.appendChild(createVoterElement(voter, project.id, columnVoterIds, columns, labels, rerender));
     }
 
     makeColumnDroppable(columnBody, column.id, rerender);
@@ -397,6 +477,10 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
 
   makeBoardColumnDroppable(board, project.id);
 
-  wrapper.append(header, board);
+  if (batchBar) {
+    wrapper.append(header, batchBar, board);
+  } else {
+    wrapper.append(header, board);
+  }
   container.appendChild(wrapper);
 }

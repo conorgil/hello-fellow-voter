@@ -1,7 +1,17 @@
 import stampImageUrl from '../assets/stamp.jpg';
 import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
-import { getColumns, getProjectMessage, getVotersForProject, moveVoter, setProjectMessage } from '../storage';
+import {
+  getColumns,
+  getLabels,
+  getProjectMessage,
+  getVotersForProject,
+  moveVoter,
+  setProjectMessage,
+  toggleVoterLabel,
+} from '../storage';
 import { DONE_STAY, type Voter } from '../types';
+import { contrastTextColor } from '../ui/color';
+import { createLabelPicker } from '../ui/labelPicker';
 import { showToast } from '../ui/toast';
 import { attachTextTooltip, attachTooltip } from '../ui/tooltip';
 
@@ -39,7 +49,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   }
 
   const overlay = document.createElement('div');
-  overlay.className = 'overlay';
+  overlay.className = 'overlay overlay--detail';
 
   const panel = document.createElement('div');
   panel.className = 'panel detail-panel';
@@ -173,6 +183,74 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   right.append(stamp, address);
   postcard.append(message, right);
 
+  const labelsContent = document.createElement('div');
+  labelsContent.className = 'detail-panel__labels detail-panel__footer-labels';
+
+  let labelPickerOpen = false;
+
+  function refreshLabels(): void {
+    renderLabelsSection();
+    rerender();
+  }
+
+  function renderLabelsSection(): void {
+    labelsContent.replaceChildren();
+
+    const allLabels = getLabels(projectId);
+    for (const label of allLabels.filter((l) => voter.labelIds.includes(l.id))) {
+      const badge = document.createElement('span');
+      badge.className = 'label-badge';
+      badge.style.backgroundColor = label.color;
+      badge.style.color = contrastTextColor(label.color);
+
+      const text = document.createElement('span');
+      text.textContent = label.name;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'label-badge__remove';
+      removeBtn.setAttribute('aria-label', `Remove label ${label.name}`);
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', () => {
+        toggleVoterLabel(voter.id, label.id);
+        voter = { ...voter, labelIds: voter.labelIds.filter((id) => id !== label.id) };
+        renderLabelsSection();
+        rerender();
+      });
+
+      badge.append(text, removeBtn);
+      labelsContent.appendChild(badge);
+    }
+
+    const picker = createLabelPicker(
+      '+ Label',
+      projectId,
+      (id) => voter.labelIds.includes(id),
+      (id) => {
+        const hasLabel = voter.labelIds.includes(id);
+        toggleVoterLabel(voter.id, id);
+        voter = {
+          ...voter,
+          labelIds: hasLabel ? voter.labelIds.filter((existing) => existing !== id) : [...voter.labelIds, id],
+        };
+        renderLabelsSection();
+        rerender();
+      },
+      refreshLabels,
+      {
+        startOpen: labelPickerOpen,
+        onOpenChange: (open) => {
+          labelPickerOpen = open;
+        },
+        panelTitle: 'Apply labels to this voter',
+        placement: 'above',
+      },
+    );
+    labelsContent.appendChild(picker);
+  }
+
+  renderLabelsSection();
+
   // Governed by the column the voter was opened from, not where an onOpen bump
   // may have just landed them — so a column's own Done/Next-voter settings
   // apply to voters that started there, instead of being silently superseded
@@ -215,6 +293,11 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
 
   const footer = document.createElement('div');
   footer.className = 'detail-panel__footer';
+  footer.appendChild(labelsContent);
+
+  const footerActions = document.createElement('div');
+  footerActions.className = 'detail-panel__footer-actions';
+  footer.appendChild(footerActions);
 
   if (doneStaysInPlace || doneTargetColumn) {
     const doneBtn = document.createElement('button');
@@ -232,7 +315,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
       close();
       rerender();
     });
-    footer.append(doneBtn);
+    footerActions.append(doneBtn);
   }
 
   if (nextTargetColumn && !displayQueueEmpty) {
@@ -248,7 +331,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     }
     attachTextTooltip(advanceBtn, nextTooltip, 400, 'above');
     advanceBtn.addEventListener('click', goToNextVoter);
-    footer.append(advanceBtn);
+    footerActions.append(advanceBtn);
   }
 
   panel.append(closeRow, postcard, footer);

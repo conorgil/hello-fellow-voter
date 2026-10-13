@@ -1,4 +1,4 @@
-import type { Column, ColumnAutomation, ColumnId, Project, StoredState, Voter } from './types';
+import type { Column, ColumnAutomation, ColumnId, Label, Project, StoredState, Voter } from './types';
 import { DEFAULT_COLUMNS } from './types';
 
 const STORAGE_KEY = 'hello-fellow-voter:v1';
@@ -8,7 +8,15 @@ function cloneDefaultColumns(): Column[] {
 }
 
 function emptyState(): StoredState {
-  return { version: 1, projects: [], activeProjectId: null, voters: [], suspectQueues: {}, columns: {} };
+  return {
+    version: 1,
+    projects: [],
+    activeProjectId: null,
+    voters: [],
+    suspectQueues: {},
+    columns: {},
+    labels: {},
+  };
 }
 
 function loadState(): StoredState {
@@ -28,12 +36,20 @@ function loadState(): StoredState {
       delete parsed.cards;
     }
     if (!parsed.voters) parsed.voters = [];
+    // Older stored state predates voter labels.
+    for (const voter of parsed.voters) {
+      if (!Array.isArray(voter.labelIds)) voter.labelIds = [];
+    }
     // Older stored state predates customizable columns; backfill the same defaults every board used to show.
     if (!parsed.columns) parsed.columns = {};
+    // Older stored state predates labels entirely.
+    if (!parsed.labels) parsed.labels = {};
     for (const project of parsed.projects ?? []) {
       if (!parsed.columns[project.id]) {
         parsed.columns[project.id] = cloneDefaultColumns();
       }
+      // Older stored state predates labels existing per-project.
+      if (!parsed.labels[project.id]) parsed.labels[project.id] = [];
       // Older stored state predates the shared per-project postcard message.
       if (typeof project.message !== 'string') project.message = '';
 
@@ -54,8 +70,15 @@ function loadState(): StoredState {
           displayNextFrom: isWritingStage ? second.id : null,
           pullFrom: isWritingStage ? first.id : null,
           pullTo: isWritingStage ? second.id : null,
+          assignLabelOnEntry: null,
         };
       });
+      // Older stored state has a column `automation` object that predates label
+      // automation specifically — the `if (col.automation) return;` guard above
+      // skips these columns entirely, so this field needs its own backfill pass.
+      for (const col of cols) {
+        if (col.automation.assignLabelOnEntry === undefined) col.automation.assignLabelOnEntry = null;
+      }
     }
     return parsed as StoredState;
   } catch (err) {
@@ -150,6 +173,7 @@ export function createProject(name: string): Project | null {
   state.projects.push(project);
   state.activeProjectId = project.id;
   state.columns[project.id] = cloneDefaultColumns();
+  state.labels[project.id] = [];
   saveState(state);
   return project;
 }
@@ -186,6 +210,7 @@ export function deleteProject(id: string): void {
   if (state.activeProjectId === id) state.activeProjectId = null;
   delete state.columns[id];
   delete state.suspectQueues[id];
+  delete state.labels[id];
   saveState(state);
 }
 
@@ -215,6 +240,7 @@ export function addColumn(projectId: string, label: string): Column | null {
       displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     },
   };
   state.columns[projectId] = [...columns, column];
@@ -282,6 +308,60 @@ export function reorderColumns(projectId: string, newOrderOfIds: string[]): bool
   return true;
 }
 
+// --- Labels ---
+
+export function getLabels(projectId: string): Label[] {
+  return loadState().labels[projectId] ?? [];
+}
+
+function isDuplicateLabelName(labels: Label[], name: string, excludeId?: string): boolean {
+  const key = name.trim().toLowerCase();
+  return labels.some((l) => l.id !== excludeId && l.name.trim().toLowerCase() === key);
+}
+
+/** Returns null if a label with this name (case-insensitive) already exists in the project. */
+export function createLabel(projectId: string, name: string, color: string): Label | null {
+  const state = loadState();
+  const labels = state.labels[projectId] ?? [];
+  if (isDuplicateLabelName(labels, name)) return null;
+  const label: Label = { id: crypto.randomUUID(), name: name.trim(), color };
+  state.labels[projectId] = [...labels, label];
+  saveState(state);
+  return label;
+}
+
+/** Returns false if the label doesn't exist or another label in the project already has this name. */
+export function updateLabel(projectId: string, labelId: string, name: string, color: string): boolean {
+  const state = loadState();
+  const labels = state.labels[projectId] ?? [];
+  const label = labels.find((l) => l.id === labelId);
+  if (!label) return false;
+  if (isDuplicateLabelName(labels, name, labelId)) return false;
+  label.name = name.trim();
+  label.color = color;
+  saveState(state);
+  return true;
+}
+
+/** Deletes a label, stripping it from every voter that had it and clearing any column automation pointing at it. */
+export function deleteLabel(projectId: string, labelId: string): void {
+  const state = loadState();
+  const labels = state.labels[projectId] ?? [];
+  if (!labels.some((l) => l.id === labelId)) return;
+  state.labels[projectId] = labels.filter((l) => l.id !== labelId);
+  for (const voter of state.voters) {
+    if (voter.projectId === projectId) {
+      voter.labelIds = voter.labelIds.filter((id) => id !== labelId);
+    }
+  }
+  for (const column of state.columns[projectId] ?? []) {
+    if (column.automation.assignLabelOnEntry === labelId) {
+      column.automation.assignLabelOnEntry = null;
+    }
+  }
+  saveState(state);
+}
+
 // --- Voters ---
 
 export function getVotersForProject(projectId: string): Voter[] {
@@ -315,6 +395,7 @@ export function addVoter(projectId: string, input: NewVoterInput): Voter {
     status: firstColumnId,
     order: nextOrderInColumn(state.voters, projectId, firstColumnId),
     createdAt: new Date().toISOString(),
+    labelIds: [],
   };
   state.voters.push(voter);
   saveState(state);
@@ -347,6 +428,28 @@ export function deleteVoter(id: string): void {
   saveState(state);
 }
 
+/**
+ * If the destination column has `assignLabelOnEntry` set, adds that label to each voter
+ * (skipping voters that already have it, and no-opping if the label was since deleted).
+ * Never removes other labels a voter already carries.
+ */
+function applyAutoLabelOnEntry(state: StoredState, voters: Voter[], newStatus: ColumnId): void {
+  const column = Object.values(state.columns)
+    .flat()
+    .find((c) => c.id === newStatus);
+  const labelId = column?.automation.assignLabelOnEntry;
+  if (!labelId) return;
+  const labelExists = Object.values(state.labels)
+    .flat()
+    .some((l) => l.id === labelId);
+  if (!labelExists) return;
+  for (const voter of voters) {
+    if (!voter.labelIds.includes(labelId)) {
+      voter.labelIds.push(labelId);
+    }
+  }
+}
+
 /** Moves a voter to a new column, optionally inserting before another voter in that column. */
 export function moveVoter(voterId: string, newStatus: ColumnId, insertBeforeVoterId: string | null): void {
   const state = loadState();
@@ -354,6 +457,7 @@ export function moveVoter(voterId: string, newStatus: ColumnId, insertBeforeVote
   if (!voter) return;
 
   voter.status = newStatus;
+  applyAutoLabelOnEntry(state, [voter], newStatus);
 
   const columnVoters = state.voters
     .filter((v) => v.projectId === voter.projectId && v.status === newStatus && v.id !== voterId)
@@ -391,11 +495,53 @@ export function moveVoters(voterIds: string[], newStatus: ColumnId): void {
   for (const voter of movingVoters) {
     voter.status = newStatus;
   }
+  applyAutoLabelOnEntry(state, movingVoters, newStatus);
 
   [...existingColumnVoters, ...movingVoters].forEach((v, i) => {
     v.order = i;
   });
 
+  saveState(state);
+}
+
+// --- Voter labels ---
+
+/** Toggles a single label on one voter. Silently no-ops if the voter doesn't exist. */
+export function toggleVoterLabel(voterId: string, labelId: string): void {
+  const state = loadState();
+  const voter = state.voters.find((v) => v.id === voterId);
+  if (!voter) return;
+  if (voter.labelIds.includes(labelId)) {
+    voter.labelIds = voter.labelIds.filter((id) => id !== labelId);
+  } else {
+    voter.labelIds.push(labelId);
+  }
+  saveState(state);
+}
+
+/** Adds a label to each voter that doesn't already have it, in one load/save cycle. */
+export function addLabelToVoters(voterIds: string[], labelId: string): void {
+  if (voterIds.length === 0) return;
+  const state = loadState();
+  const idSet = new Set(voterIds);
+  for (const voter of state.voters) {
+    if (idSet.has(voter.id) && !voter.labelIds.includes(labelId)) {
+      voter.labelIds.push(labelId);
+    }
+  }
+  saveState(state);
+}
+
+/** Removes a label from each voter that has it, in one load/save cycle. */
+export function removeLabelFromVoters(voterIds: string[], labelId: string): void {
+  if (voterIds.length === 0) return;
+  const state = loadState();
+  const idSet = new Set(voterIds);
+  for (const voter of state.voters) {
+    if (idSet.has(voter.id)) {
+      voter.labelIds = voter.labelIds.filter((id) => id !== labelId);
+    }
+  }
   saveState(state);
 }
 

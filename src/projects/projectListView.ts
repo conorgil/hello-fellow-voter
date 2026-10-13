@@ -2,6 +2,7 @@ import { openNewProjectForm } from '../forms/newProjectForm';
 import { openRenameProjectForm } from '../forms/renameProjectForm';
 import { createHelpButton } from '../splash/helpButton';
 import { deleteProject, getVotersForProject, getProjects, setActiveProject } from '../storage';
+import { confirmDialog } from '../ui/confirmDialog';
 
 export function renderProjectList(container: HTMLElement, rerender: () => void): void {
   const wrapper = document.createElement('div');
@@ -72,10 +73,13 @@ export function renderProjectList(container: HTMLElement, rerender: () => void):
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn btn--danger';
     deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => {
-      const confirmed = window.confirm(
-        `Delete "${project.name}" and all ${voterCount} of its voters? This can't be undone.`,
-      );
+    deleteBtn.addEventListener('click', async () => {
+      const confirmed = await confirmDialog({
+        title: 'Delete project',
+        message: `Delete "${project.name}" and all ${voterCount} of its voters? This can't be undone.`,
+        confirmLabel: 'Delete',
+        danger: true,
+      });
       if (!confirmed) return;
       deleteProject(project.id);
       rerender();

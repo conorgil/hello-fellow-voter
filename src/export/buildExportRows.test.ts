@@ -14,6 +14,7 @@ function makeVoter(overrides: Partial<Voter>): Voter {
     status: 'todo',
     order: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
+    labelIds: [],
     ...overrides,
   };
 }
@@ -100,6 +101,7 @@ describe('summarizeByStatus', () => {
       displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     };
     const customColumns = [
       { id: 'inbox', label: 'Inbox', automation: noAutomation },

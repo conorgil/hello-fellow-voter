@@ -72,7 +72,12 @@ button {
   background: #f0f1f3;
 }
 .btn--secondary:disabled {
-  opacity: 0.5;
+  /* Solid colors, not opacity: a disabled button can have a tooltip appended
+     as its own DOM child (see ui/tooltip.ts), and opacity on the button would
+     composite that tooltip into the same translucent layer, making it look
+     faded too. */
+  color: var(--color-text-muted);
+  background: white;
   cursor: not-allowed;
 }
 .btn--secondary:disabled:hover {
@@ -178,6 +183,9 @@ button {
 }
 
 .board-header__title--editable {
+  position: relative;
+  /* See .board-header__history-btn above: lifts this button's tooltip above `.board`. */
+  z-index: 50;
   font: inherit;
   font-weight: 700;
   text-align: left;
@@ -227,6 +235,18 @@ button {
   justify-content: center;
   font-size: 1.1rem;
   flex-shrink: 0;
+  /* Without an explicit z-index, this positioned element and `.board` (also
+     position: relative) both land in the "positioned, z-index: auto" paint
+     phase, which paints in DOM order — so `.board`'s columns, coming later in
+     the markup, paint on top of this button's tooltip regardless of the
+     tooltip's own z-index. An explicit value here lifts it into its own
+     stacking context above that phase. Matches `.dropdown__menu`'s z-index. */
+  z-index: 50;
+}
+
+.board-header__export-btn {
+  position: relative;
+  z-index: 50;
 }
 
 .board {
@@ -273,6 +293,11 @@ button {
 }
 
 .column__title {
+  position: relative;
+  /* Needed so its tooltip anchors here (not the nearest positioned ancestor,
+     `.board`) and paints above the next column over, not underneath it —
+     same reasoning as `.board-header__history-btn` above. */
+  z-index: 2;
   display: inline-flex;
   align-items: flex-start;
   gap: 0.4rem;
@@ -448,6 +473,42 @@ button {
   gap: 0.25rem;
 }
 
+.voter-card__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-left: 1.5rem;
+  padding-right: 3rem;
+  margin-top: 0.35rem;
+}
+
+.label-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.label-badge--active-filter {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.label-badge__remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+}
+
 .drag-group-preview {
   position: fixed;
   top: -1000px;
@@ -490,6 +551,12 @@ button {
   padding: 1.5rem;
 }
 
+.overlay--detail {
+  align-items: flex-start;
+  /* Leaves the board header + column name row visible above the panel. */
+  padding-top: 7.5rem;
+}
+
 .panel {
   background: var(--color-panel);
   border-radius: var(--radius);
@@ -501,8 +568,10 @@ button {
 }
 
 .detail-panel {
-  width: min(900px, 90vw);
-  height: min(560px, 90vh);
+  width: 96vw;
+  /* Clears the board header + column name row above (~7.5rem combined), so
+     they stay visible behind the dimmed overlay instead of being covered. */
+  height: calc(100vh - 9rem);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -650,6 +719,11 @@ button {
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   color: var(--color-text);
+  /* Set explicitly rather than inherited, since the host element (whatever
+     button or link the tooltip is attached to) may set its own text-align or
+     font-weight for its own label, which would otherwise leak into this. */
+  text-align: left;
+  font-weight: 400;
   font-size: 0.8rem;
   line-height: 1.4;
   white-space: normal;
@@ -668,6 +742,11 @@ button {
   bottom: 100%;
   margin-top: 0;
   margin-bottom: 0.4rem;
+}
+
+.tooltip--left {
+  right: auto;
+  left: 0;
 }
 
 .postcard-address {
@@ -689,7 +768,20 @@ button {
 
 .detail-panel__footer {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.detail-panel__footer-labels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.detail-panel__footer-actions {
+  display: flex;
   gap: 0.75rem;
 }
 
@@ -853,6 +945,203 @@ button {
   width: min(640px, 92vw);
 }
 
+.label-manager-panel {
+  width: min(480px, 90vw);
+}
+
+.confirm-dialog {
+  width: min(400px, 90vw);
+}
+
+.confirm-dialog__message {
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.label-picker__menu {
+  min-width: 280px;
+}
+
+.label-picker--above .label-picker__menu {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+}
+
+.label-picker__title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  padding: 0.3rem 0.6rem 0.1rem;
+}
+
+.label-picker__search {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.6rem;
+  margin: 0.2rem 0 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+}
+
+.label-picker__list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.label-picker__create-row {
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  width: 100%;
+}
+.label-picker__create-row:hover {
+  background: #f0f1f3;
+}
+
+.label-picker__create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+}
+.label-picker__create-form .form-actions {
+  margin-top: 0;
+}
+
+.label-picker__footer {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.35rem;
+  padding-top: 0.25rem;
+  display: flex;
+  justify-content: flex-start;
+}
+.label-picker__footer .btn--link {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.6rem;
+}
+
+.label-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.label-picker__item:hover {
+  background: #f0f1f3;
+}
+
+.label-picker__swatch {
+  display: inline-block;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.label-picker__name {
+  flex: 1;
+}
+
+.label-picker__check {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.label-picker__empty {
+  padding: 0.5rem 0.6rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.label-manager__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.label-manager__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.label-manager__edit-form,
+.label-manager__add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+}
+
+.label-manager__empty {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.color-swatch-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.color-swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-swatch--selected {
+  border-color: var(--color-text);
+}
+
+.color-swatch--custom {
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+}
+
+.color-swatch-grid__custom-input {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.board-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
 .automation-group {
   min-width: 0;
   border: 1px solid var(--color-border);
@@ -980,6 +1269,20 @@ button {
 }
 
 .automation-field[hidden] {
+  display: none;
+}
+
+.automation-label-create {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.automation-label-create[hidden] {
   display: none;
 }
 

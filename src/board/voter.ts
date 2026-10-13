@@ -1,8 +1,11 @@
 import { openDetailView } from '../detail/detailView';
 import { openVoterForm } from '../forms/voterForm';
 import { deleteVoter, moveVoter, moveVoters } from '../storage';
-import type { Column, Voter } from '../types';
+import type { Column, Label, Voter } from '../types';
+import { contrastTextColor } from '../ui/color';
+import { confirmDialog } from '../ui/confirmDialog';
 import { makeVoterDraggable } from './dragDrop';
+import { isLabelFilterActive, toggleLabelFilter } from './labelFilter';
 import {
   clearSelection,
   getSelectedCount,
@@ -18,6 +21,7 @@ export function createVoterElement(
   projectId: string,
   columnVoterIds: string[],
   columns: Column[],
+  labels: Label[],
   rerender: () => void,
 ): HTMLElement {
   const el = document.createElement('div');
@@ -53,6 +57,26 @@ export function createVoterElement(
   addr.className = 'voter-card__address';
   addr.textContent = `${voter.street}, ${voter.city}, ${voter.state} ${voter.zip}`;
 
+  const voterLabels = labels.filter((l) => voter.labelIds.includes(l.id));
+  const labelsRow = document.createElement('div');
+  labelsRow.className = 'voter-card__labels';
+  for (const label of voterLabels) {
+    const badge = document.createElement('button');
+    badge.type = 'button';
+    badge.className = 'label-badge';
+    if (isLabelFilterActive(label.id)) badge.classList.add('label-badge--active-filter');
+    badge.style.backgroundColor = label.color;
+    badge.style.color = contrastTextColor(label.color);
+    badge.textContent = label.name;
+    badge.setAttribute('aria-label', `Filter by label ${label.name}`);
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleLabelFilter(label.id);
+      rerender();
+    });
+    labelsRow.appendChild(badge);
+  }
+
   const controls = document.createElement('div');
   controls.className = 'voter-card__controls';
 
@@ -69,9 +93,15 @@ export function createVoterElement(
   deleteBtn.className = 'voter-card__icon-btn';
   deleteBtn.setAttribute('aria-label', 'Delete voter');
   deleteBtn.textContent = '×';
-  deleteBtn.addEventListener('click', (e) => {
+  deleteBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
-    if (confirm(`Delete the voter for ${voter.name}?`)) {
+    const confirmed = await confirmDialog({
+      title: 'Delete voter',
+      message: `Delete the voter for ${voter.name}?`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (confirmed) {
       deleteVoter(voter.id);
       removeFromSelection(voter.id);
       rerender();
@@ -79,7 +109,11 @@ export function createVoterElement(
   });
 
   controls.append(editBtn, deleteBtn);
-  el.append(select, name, addr, controls);
+  if (voterLabels.length > 0) {
+    el.append(select, name, addr, labelsRow, controls);
+  } else {
+    el.append(select, name, addr, controls);
+  }
 
   el.addEventListener('click', (e) => {
     if (e.shiftKey) {

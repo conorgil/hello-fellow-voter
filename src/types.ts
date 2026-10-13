@@ -22,6 +22,8 @@ export interface ColumnAutomation {
   pullFrom: string | null;
   /** Column to move that voter into. */
   pullTo: string | null;
+  /** Label to assign to a voter whenever they enter this column, by any means (drag, keyboard, or another automation step). Null = don't assign a label. */
+  assignLabelOnEntry: string | null;
 }
 
 export interface Column {
@@ -41,6 +43,7 @@ export const DEFAULT_COLUMNS: Column[] = [
       displayNextFrom: 'writing',
       pullFrom: 'todo',
       pullTo: 'writing',
+      assignLabelOnEntry: null,
     },
   },
   {
@@ -53,6 +56,7 @@ export const DEFAULT_COLUMNS: Column[] = [
       displayNextFrom: 'writing',
       pullFrom: 'todo',
       pullTo: 'writing',
+      assignLabelOnEntry: null,
     },
   },
   {
@@ -65,6 +69,7 @@ export const DEFAULT_COLUMNS: Column[] = [
       displayNextFrom: 'written',
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     },
   },
   {
@@ -77,6 +82,7 @@ export const DEFAULT_COLUMNS: Column[] = [
       displayNextFrom: 'stamped',
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     },
   },
   {
@@ -89,9 +95,17 @@ export const DEFAULT_COLUMNS: Column[] = [
       displayNextFrom: null,
       pullFrom: null,
       pullTo: null,
+      assignLabelOnEntry: null,
     },
   },
 ];
+
+export interface Label {
+  id: string;
+  name: string;
+  /** '#rrggbb' */
+  color: string;
+}
 
 export interface Project {
   id: string;
@@ -111,6 +125,7 @@ export interface Voter {
   status: ColumnId;
   order: number;
   createdAt: string;
+  labelIds: string[];
 }
 
 export interface StoredState {
@@ -121,4 +136,5 @@ export interface StoredState {
   /** Lines from a PDF/paste import that might be addresses but couldn't be parsed automatically, awaiting manual review. */
   suspectQueues: Record<string, string[]>;
   columns: Record<string, Column[]>;
+  labels: Record<string, Label[]>;
 }

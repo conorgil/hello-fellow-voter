@@ -6,6 +6,7 @@ import { renderProjectList } from './projects/projectListView';
 import { isSplashPermanentlyDismissed } from './splash/splashPrefs';
 import { openSplash } from './splash/splashView';
 import { getActiveProject, redo, undo } from './storage';
+import { attachTextTooltip } from './ui/tooltip';
 
 const app: HTMLDivElement =
   document.querySelector<HTMLDivElement>('#app') ??
@@ -46,6 +47,11 @@ document.addEventListener('keydown', (e) => {
 });
 
 render();
+
+const ghCorner = document.querySelector<HTMLAnchorElement>('.gh-corner');
+if (ghCorner) {
+  attachTextTooltip(ghCorner, 'This tool is open-source! Check out the code on GitHub.', 400);
+}
 
 if (!isSplashPermanentlyDismissed()) {
   openSplash();
