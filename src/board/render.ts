@@ -31,7 +31,7 @@ import { attachTextTooltip } from '../ui/tooltip';
 import { showToast } from '../ui/toast';
 import { createVoterElement } from './voter';
 import { makeColumnDroppable } from './dragDrop';
-import { dragAndDrop } from '@formkit/drag-and-drop';
+import { dragAndDrop, insert } from '@formkit/drag-and-drop';
 import { clearLabelFilter, getActiveLabelFilters, pruneLabelFilters } from './labelFilter';
 import { clearSelection, getSelectedCount, getSelectedIds, isSelected, toggleSelectAllInColumn } from './selection';
 
@@ -527,6 +527,15 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
       longPress: true,
       longPressDuration: 450,
       draggingClass: 'column--dragging',
+      plugins: [
+        insert({
+          insertPoint: () => {
+            const el = document.createElement('div');
+            el.className = 'column-drop-indicator';
+            return el;
+          },
+        }),
+      ],
     },
   });
 
