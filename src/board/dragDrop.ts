@@ -12,6 +12,13 @@ function createGroupDragPreview(count: number): HTMLElement {
 
 export function makeVoterDraggable(el: HTMLElement, voter: Voter): void {
   el.addEventListener('dragstart', (e) => {
+    // The column-reordering drag-and-drop library attaches its own native
+    // dragstart listener to the enclosing .column element, and cancels any
+    // dragstart that didn't originate from its drag handle. Left alone, that
+    // bubbles up from this card and kills the drag before dragover/drop ever
+    // fire — the card greys out (below) and then never moves. Stopping
+    // propagation here keeps that cancellation from ever seeing this event.
+    e.stopPropagation();
     e.dataTransfer?.setData('text/plain', voter.id);
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
     el.classList.add('dragging');
