@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_MESSAGE } from './postcardMessages';
 import {
   addColumn,
   addLabelToVoters,
@@ -220,9 +221,9 @@ describe('project name uniqueness', () => {
 });
 
 describe('project message', () => {
-  it('defaults to an empty string for a freshly created project', () => {
+  it('defaults to the proven-effective default message for a freshly created project', () => {
     const project = mustCreateProject('Message Default Project');
-    expect(getProjectMessage(project.id)).toBe('');
+    expect(getProjectMessage(project.id)).toBe(DEFAULT_MESSAGE);
   });
 
   it('round-trips a stored message', () => {
@@ -530,7 +531,7 @@ describe('column migration backfill', () => {
 });
 
 describe('message migration backfill', () => {
-  it('backfills an empty message for pre-existing projects with no stored message', () => {
+  it('backfills the default message for pre-existing projects with no stored message', () => {
     const raw = {
       version: 1,
       projects: [{ id: 'legacy-project', name: 'Legacy Project', createdAt: '2025-01-01T00:00:00.000Z' }],
@@ -540,7 +541,27 @@ describe('message migration backfill', () => {
     };
     localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
 
-    expect(getProjectMessage('legacy-project')).toBe('');
+    expect(getProjectMessage('legacy-project')).toBe(DEFAULT_MESSAGE);
+  });
+
+  it('leaves an existing custom message untouched', () => {
+    const raw = {
+      version: 1,
+      projects: [
+        {
+          id: 'legacy-project',
+          name: 'Legacy Project',
+          createdAt: '2025-01-01T00:00:00.000Z',
+          message: 'My own hand-written message',
+        },
+      ],
+      activeProjectId: 'legacy-project',
+      voters: [],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    expect(getProjectMessage('legacy-project')).toBe('My own hand-written message');
   });
 });
 

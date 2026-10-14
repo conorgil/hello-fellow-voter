@@ -1,5 +1,6 @@
 import type { Column, ColumnAutomation, ColumnId, Label, Project, StoredState, Voter } from './types';
 import { DEFAULT_COLUMNS } from './types';
+import { DEFAULT_MESSAGE } from './postcardMessages';
 
 const STORAGE_KEY = 'hello-fellow-voter:v1';
 
@@ -52,6 +53,9 @@ function loadState(): StoredState {
       if (!parsed.labels[project.id]) parsed.labels[project.id] = [];
       // Older stored state predates the shared per-project postcard message.
       if (typeof project.message !== 'string') project.message = '';
+      // Backfill the proven-effective default for any project that never got a
+      // message of its own — leaves an already-customized (non-empty) message untouched.
+      if (project.message === '') project.message = DEFAULT_MESSAGE;
 
       // Older stored state predates configurable column automation; backfill the
       // equivalent of the old hardcoded Done/Next-voter behavior.
@@ -168,7 +172,7 @@ export function createProject(name: string): Project | null {
     id: crypto.randomUUID(),
     name: name.trim(),
     createdAt: new Date().toISOString(),
-    message: '',
+    message: DEFAULT_MESSAGE,
   };
   state.projects.push(project);
   state.activeProjectId = project.id;
