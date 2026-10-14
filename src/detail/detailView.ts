@@ -1,4 +1,5 @@
 import stampImageUrl from '../assets/stamp.jpg';
+import { openMessagePickerForm } from '../forms/messagePickerForm';
 import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
 import {
   getColumns,
@@ -69,84 +70,86 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   closeRow.className = 'detail-panel__close-row';
   closeRow.appendChild(closeBtn);
 
+  const postcardFrame = document.createElement('div');
+  postcardFrame.className = 'postcard-frame';
+
   const postcard = document.createElement('div');
   postcard.className = 'postcard';
+  postcardFrame.appendChild(postcard);
 
+  // The entire left side (including its padding, not just the ruled-lines box)
+  // is the clickable target — role/tabIndex/listeners live on `message` itself.
   const message = document.createElement('div');
   message.className = 'postcard__message';
+  message.tabIndex = 0;
+  message.setAttribute('role', 'button');
+  message.setAttribute('aria-label', 'Edit postcard message');
+  message.addEventListener('click', openPicker);
+  message.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openPicker();
+    }
+  });
 
   let currentMessage = getProjectMessage(projectId);
 
   function showMessageDisplay(): void {
-    // A real <button> vertically centers its content via Chromium's internal
-    // layout for button elements, which can't be overridden with CSS on the
-    // button itself — use a div+role="button" instead, matching the voter-card
-    // clickable-area pattern in src/board/voter.ts.
-    const clickable = document.createElement('div');
-    clickable.className = 'postcard__message-display';
-    clickable.tabIndex = 0;
-    clickable.setAttribute('role', 'button');
-    clickable.setAttribute('aria-label', 'Edit postcard message');
+    const display = document.createElement('div');
+    display.className = 'postcard__message-display';
 
+    let text: HTMLElement | null = null;
     if (currentMessage) {
-      const text = document.createElement('span');
+      text = document.createElement('span');
       text.className = 'postcard__message-text';
       text.textContent = currentMessage;
-      clickable.appendChild(text);
+      display.appendChild(text);
     } else {
       const placeholder = document.createElement('span');
       placeholder.className = 'postcard__message-placeholder';
       placeholder.textContent = 'Your message goes here. Click this text to customize!';
-      clickable.appendChild(placeholder);
+      display.appendChild(placeholder);
     }
 
-    clickable.addEventListener('click', showMessageEditor);
-    clickable.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        showMessageEditor();
-      }
-    });
-    message.replaceChildren(clickable);
+    const stack = document.createElement('div');
+    stack.className = 'postcard__message-stack';
+    stack.appendChild(display);
+
+    if (currentMessage) {
+      // A sibling of the ruled-lines box, not inside it, so it always sits
+      // right after the last line of text instead of occupying a ruled line
+      // of its own.
+      const hint = document.createElement('span');
+      hint.className = 'postcard__message-hint';
+      hint.setAttribute('aria-hidden', 'true');
+      const hintIcon = document.createElement('span');
+      hintIcon.className = 'material-symbols-outlined postcard__message-hint-icon';
+      hintIcon.textContent = 'edit';
+      hint.append(hintIcon, document.createTextNode('Click to customize'));
+      stack.appendChild(hint);
+    }
+
+    message.replaceChildren(stack);
+
+    // Sizes the ruled-lines box to exactly the number of lines this message's
+    // text wraps to, so there's never leftover blank ruled lines (short
+    // message) or an overflowing/truncated line (long message). Requires
+    // `message` to be attached to the document to measure real wrapped
+    // height — the very first call happens before that, so it's re-run once
+    // the overlay is appended.
+    if (text && display.isConnected) {
+      const lineHeight = parseFloat(getComputedStyle(text).lineHeight);
+      const lines = Math.max(1, Math.round(text.offsetHeight / lineHeight));
+      display.style.height = `${lines * lineHeight}px`;
+    }
   }
 
-  function showMessageEditor(): void {
-    const form = document.createElement('form');
-    const textarea = document.createElement('textarea');
-    textarea.className = 'postcard__message-textarea';
-    textarea.value = currentMessage;
-    textarea.maxLength = 500;
-    form.appendChild(textarea);
-    message.replaceChildren(form);
-
-    let cancelled = false;
-
-    function commit(): void {
-      currentMessage = textarea.value.trim();
-      setProjectMessage(projectId, currentMessage);
+  function openPicker(): void {
+    openMessagePickerForm(currentMessage, (newMessage) => {
+      currentMessage = newMessage;
+      setProjectMessage(projectId, newMessage);
       showMessageDisplay();
-    }
-
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      commit();
     });
-
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        cancelled = true;
-        showMessageDisplay();
-      }
-    });
-
-    textarea.addEventListener('blur', () => {
-      if (cancelled) return;
-      commit();
-    });
-
-    textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
   }
 
   showMessageDisplay();
@@ -338,9 +341,14 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     footerActions.append(advanceBtn);
   }
 
-  panel.append(closeRow, postcard, footer);
+  panel.append(closeRow, postcardFrame, footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
+
+  // Re-run now that `message` is actually attached, so the message box's
+  // dynamic line-count measurement reflects real layout instead of skipping
+  // (see the isConnected check inside showMessageDisplay).
+  showMessageDisplay();
 
   shrinkLinesToFit([nameLine, streetLine, cityLine]);
 

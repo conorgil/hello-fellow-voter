@@ -8,6 +8,7 @@
   --color-primary-dark: #1d4ed8;
   --color-danger: #dc2626;
   --color-success: #15803d;
+  --color-warning: #9a6700;
   --radius: 10px;
   --gap: 1rem;
   --gh-corner-size: 58px;
@@ -16,6 +17,18 @@
 
 * {
   box-sizing: border-box;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  font-variation-settings: 'opsz' 24, 'wght' 400, 'FILL' 0, 'GRAD' 0;
 }
 
 html,
@@ -216,6 +229,12 @@ button {
 
 .form-error {
   color: var(--color-danger);
+  font-size: 0.85rem;
+  margin: -0.5rem 0 0;
+}
+
+.form-warning {
+  color: var(--color-warning);
   font-size: 0.85rem;
   margin: -0.5rem 0 0;
 }
@@ -707,8 +726,16 @@ button {
   .detail-panel__footer {
     flex-shrink: 0;
   }
+  /* This cramped layout doesn't have the vertical room for a true 3:2 card —
+     holding the aspect ratio here would squeeze the postcard (and the address
+     column inside it) down to a sliver. Fill the available box instead, same
+     as before the postcard became aspect-ratio-constrained. `.overlay--detail`
+     prefix (not just `.postcard`) is needed to outrank the unconditional
+     `.postcard` rule declared later in this file on specificity ties. */
   .overlay--detail .postcard {
-    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
   }
 }
 
@@ -762,13 +789,28 @@ button {
   color: var(--color-text);
 }
 
-.postcard {
+/* Centers the postcard within whatever vertical space is available, letting
+   the postcard itself size to a real 4x6in card's 3:2 ratio instead of
+   stretching to fill the panel. */
+.postcard-frame {
   flex: 1;
   min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.postcard {
+  width: auto;
+  height: auto;
+  aspect-ratio: 3 / 2;
+  max-width: 100%;
+  max-height: 100%;
   display: flex;
   border: 2px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-panel);
+  overflow: hidden;
 }
 
 .postcard__message {
@@ -778,14 +820,32 @@ button {
   padding: 1.5rem 1.25rem 1.5rem 1.5rem;
   display: flex;
   align-items: center;
+  position: relative;
+  cursor: pointer;
 }
 
-/* Exactly 5 ruled lines (line-height below is 2.5rem), vertically centered in
-   the available space via `.postcard__message`'s `align-items: center`. */
-.postcard__message-display,
-.postcard__message > form {
+.postcard__message:hover {
+  background-color: #f0f1f3;
+}
+
+.postcard__message:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.postcard__message-stack {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  height: calc(5 * 2.5rem);
+  min-width: 0;
+}
+
+/* Height is set per-message by JS (see showMessageDisplay), sized to exactly
+   the number of lines that message's text wraps to — ruled lines are drawn
+   via the repeating background regardless of the box's height. */
+.postcard__message-display {
+  width: 100%;
+  height: calc(2 * 2.5rem);
   background-image: repeating-linear-gradient(
     to bottom,
     transparent,
@@ -794,23 +854,24 @@ button {
     var(--color-border) 2.5rem
   );
   background-position-y: 2.15rem;
-}
-
-.postcard__message-display {
   display: block;
-  border-radius: 6px;
-  cursor: pointer;
   overflow-y: auto;
 }
 
-.postcard__message-display:hover {
-  /* `background-color`, not the `background` shorthand, so it doesn't clear
-     the ruled-line background-image set above. */
-  background-color: #f0f1f3;
+/* Ghost "click to customize" hint signalling the message is editable — a
+   plain caption below the ruled-lines box, not a ruled line of its own. */
+.postcard__message-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--color-text-muted);
 }
 
-.postcard__message-display:focus-visible {
-  outline: 2px solid var(--color-primary);
+.postcard__message-hint-icon {
+  font-size: 1rem;
 }
 
 .postcard__message-placeholder,
@@ -828,25 +889,6 @@ button {
 
 .postcard__message-text {
   color: var(--color-text);
-}
-
-.postcard__message-textarea {
-  width: 100%;
-  height: 100%;
-  font: inherit;
-  font-family: 'Segoe Script', 'Bradley Hand', 'Apple Chancery', cursive;
-  font-size: 1.5rem;
-  line-height: 2.5rem;
-  padding: 0;
-  border: none;
-  resize: none;
-  background: none;
-  color: var(--color-text);
-  overflow-y: auto;
-}
-
-.postcard__message-textarea:focus {
-  outline: none;
 }
 
 .postcard__right {
@@ -1113,6 +1155,77 @@ button {
 
 .label-manager-panel {
   width: min(480px, 90vw);
+}
+
+.message-picker-panel {
+  width: min(560px, 92vw);
+}
+
+.message-picker__intro {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.message-picker__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.message-picker__option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: left;
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.message-picker__option:hover {
+  border-color: var(--color-primary);
+}
+
+.message-picker__option--selected {
+  border-color: var(--color-primary);
+  border-width: 2px;
+  padding: calc(0.6rem - 1px) calc(0.75rem - 1px);
+  background: #eef3fe;
+}
+
+.message-picker__option-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.message-picker__option-preview {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.message-picker__textarea {
+  width: 100%;
+  min-height: 7rem;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+
+.message-picker__textarea:focus {
+  outline: 2px solid var(--color-primary);
 }
 
 .confirm-dialog {
