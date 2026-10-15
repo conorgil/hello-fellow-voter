@@ -1,6 +1,7 @@
 import { openDetailView } from '../detail/detailView';
 import { openVoterForm } from '../forms/voterForm';
 import { deleteVoter, moveVoter, moveVoters } from '../storage';
+import { titleCase } from '../titleCase';
 import type { Column, Label, Voter } from '../types';
 import { contrastTextColor } from '../ui/color';
 import { confirmDialog } from '../ui/confirmDialog';
@@ -31,13 +32,16 @@ export function createVoterElement(
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
   el.dataset.voterId = voter.id;
-  el.setAttribute('aria-label', `${voter.name}, ${voter.street}, ${voter.city}, ${voter.state} ${voter.zip}`);
+  el.setAttribute(
+    'aria-label',
+    `${titleCase(voter.name)}, ${titleCase(voter.street)}, ${titleCase(voter.city)}, ${voter.state} ${voter.zip}`,
+  );
 
   const select = document.createElement('input');
   select.type = 'checkbox';
   select.className = 'voter-card__select';
   select.checked = isSelected(voter.id);
-  select.setAttribute('aria-label', `Select ${voter.name}`);
+  select.setAttribute('aria-label', `Select ${titleCase(voter.name)}`);
   select.addEventListener('click', (e) => {
     e.stopPropagation();
     e.preventDefault();
@@ -51,11 +55,11 @@ export function createVoterElement(
 
   const name = document.createElement('div');
   name.className = 'voter-card__name';
-  name.textContent = voter.name;
+  name.textContent = titleCase(voter.name);
 
   const addr = document.createElement('div');
   addr.className = 'voter-card__address';
-  addr.textContent = `${voter.street}, ${voter.city}, ${voter.state} ${voter.zip}`;
+  addr.textContent = `${titleCase(voter.street)}, ${titleCase(voter.city)}, ${voter.state} ${voter.zip}`;
 
   const voterLabels = labels.filter((l) => voter.labelIds.includes(l.id));
   const labelsRow = document.createElement('div');
@@ -97,7 +101,7 @@ export function createVoterElement(
     e.stopPropagation();
     const confirmed = await confirmDialog({
       title: 'Delete voter',
-      message: `Delete the voter for ${voter.name}?`,
+      message: `Delete the voter for ${titleCase(voter.name)}?`,
       confirmLabel: 'Delete',
       danger: true,
     });

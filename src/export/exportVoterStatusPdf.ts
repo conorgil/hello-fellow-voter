@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FIELD_SEPARATOR, HFV_MARKER } from '../pdf/parseHfvExport';
 import { getColumns } from '../storage';
+import { titleCase } from '../titleCase';
 import type { Project, Voter } from '../types';
 import { buildExportRows, summarizeByStatus } from './buildExportRows';
 
@@ -90,7 +91,14 @@ export function buildVoterStatusPdfDoc(project: Project, voters: Voter[]): jsPDF
     startY: introBottom + 48,
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
     head: [['Name', 'Street', 'City', 'State', 'ZIP', 'Status']],
-    body: exportRows.map((row) => [row.name, row.street, row.city, row.state, row.zip, row.status]),
+    body: exportRows.map((row) => [
+      titleCase(row.name),
+      titleCase(row.street),
+      titleCase(row.city),
+      row.state,
+      row.zip,
+      row.status,
+    ]),
     didDrawCell: (data) => {
       if (data.section !== 'body' || data.column.index !== data.table.columns.length - 1) return;
       // A row whose wrapped cell content doesn't fit before a page break gets split by

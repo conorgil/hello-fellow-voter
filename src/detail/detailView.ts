@@ -18,6 +18,7 @@ import { contrastTextColor } from '../ui/color';
 import { createLabelPicker } from '../ui/labelPicker';
 import { showToast } from '../ui/toast';
 import { attachTextTooltip, attachTooltip } from '../ui/tooltip';
+import { titleCase } from '../titleCase';
 
 /**
  * Shrinks every line to the same font size — the smallest size that keeps the
@@ -190,15 +191,15 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
 
   const nameLine = document.createElement('div');
   nameLine.className = 'postcard-address__line';
-  nameLine.textContent = voter.name;
+  nameLine.textContent = titleCase(voter.name);
 
   const streetLine = document.createElement('div');
   streetLine.className = 'postcard-address__line';
-  streetLine.textContent = voter.street;
+  streetLine.textContent = titleCase(voter.street);
 
   const cityLine = document.createElement('div');
   cityLine.className = 'postcard-address__line';
-  cityLine.textContent = `${voter.city}, ${voter.state} ${voter.zip}`;
+  cityLine.textContent = `${titleCase(voter.city)}, ${voter.state} ${voter.zip}`;
 
   address.append(nameLine, streetLine, cityLine);
   right.append(stamp, address);
