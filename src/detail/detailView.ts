@@ -1,13 +1,16 @@
 import stampImageUrl from '../assets/stamp.jpg';
 import { openMessagePickerForm } from '../forms/messagePickerForm';
 import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
+import { getFontFamily } from '../postcardFonts';
 import {
   getColumns,
   getLabels,
   getProjectMessage,
+  getProjectMessageFont,
   getVotersForProject,
   moveVoter,
   setProjectMessage,
+  setProjectMessageFont,
   toggleVoterLabel,
 } from '../storage';
 import { DONE_STAY, type Voter } from '../types';
@@ -19,9 +22,18 @@ import { attachTextTooltip, attachTooltip } from '../ui/tooltip';
 /**
  * Shrinks every line to the same font size — the smallest size that keeps the
  * longest-overflowing line on one line — so the three address lines never
- * appear at mismatched sizes.
+ * appear at mismatched sizes. Always re-measures from the CSS-driven (clamp)
+ * size rather than whatever a previous call left behind, so it finds the
+ * largest font that still fits the *current* container size — called again
+ * on every resize (see the ResizeObserver in openDetailView), it never leaves
+ * an address clipped at a size the container has since shrunk below, and it
+ * grows back up if the container grows again.
  */
 function shrinkLinesToFit(lines: HTMLElement[]): void {
+  for (const line of lines) {
+    line.style.fontSize = '';
+  }
+
   const scales = lines.map((line) =>
     line.scrollWidth <= line.clientWidth ? 1 : (line.clientWidth / line.scrollWidth) * 0.97,
   );
@@ -89,21 +101,25 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   });
 
   let currentMessage = getProjectMessage(projectId);
+  let currentFont = getProjectMessageFont(projectId);
 
   function showMessageDisplay(): void {
     const display = document.createElement('div');
     display.className = 'postcard__message-display';
+    const fontFamily = getFontFamily(currentFont);
 
     let text: HTMLElement | null = null;
     if (currentMessage) {
       text = document.createElement('span');
       text.className = 'postcard__message-text';
       text.textContent = currentMessage;
+      text.style.fontFamily = fontFamily;
       display.appendChild(text);
     } else {
       const placeholder = document.createElement('span');
       placeholder.className = 'postcard__message-placeholder';
       placeholder.textContent = 'Your message goes here. Click this text to customize!';
+      placeholder.style.fontFamily = fontFamily;
       display.appendChild(placeholder);
     }
 
@@ -141,9 +157,11 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   }
 
   function openPicker(): void {
-    openMessagePickerForm(currentMessage, (newMessage) => {
+    openMessagePickerForm(currentMessage, currentFont, (newMessage, newFont) => {
       currentMessage = newMessage;
+      currentFont = newFont;
       setProjectMessage(projectId, newMessage);
+      setProjectMessageFont(projectId, newFont);
       showMessageDisplay();
     });
   }
@@ -348,6 +366,15 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
 
   shrinkLinesToFit([nameLine, streetLine, cityLine]);
 
+  // The postcard (and the address column inside it) resizes with the
+  // window/panel — re-fit on every size change instead of only once at open,
+  // otherwise shrinking the window after opening leaves the address at a
+  // stale, now-too-large font size and it clips.
+  const addressResizeObserver = new ResizeObserver(() => {
+    shrinkLinesToFit([nameLine, streetLine, cityLine]);
+  });
+  addressResizeObserver.observe(postcard);
+
   function goToNextVoter(): void {
     if (!nextTargetColumn) return;
 
@@ -373,6 +400,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     overlay.remove();
     document.body.classList.remove('detail-view-open');
     document.removeEventListener('keydown', onKeydown);
+    addressResizeObserver.disconnect();
   }
 
   function onKeydown(e: KeyboardEvent): void {
@@ -385,6 +413,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     // display needs its own refresh to pick up the reverted/reapplied value.
     if (isUndoShortcut(e) || isRedoShortcut(e)) {
       currentMessage = getProjectMessage(projectId);
+      currentFont = getProjectMessageFont(projectId);
       showMessageDisplay();
     }
 

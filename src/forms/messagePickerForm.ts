@@ -1,4 +1,5 @@
 import { MESSAGE_PRESETS, isCustomMessage } from '../postcardMessages';
+import { MESSAGE_FONTS, getFontFamily } from '../postcardFonts';
 import { confirmDialog } from '../ui/confirmDialog';
 
 type Selection = { kind: 'preset'; id: 'A' | 'B' | 'C' } | { kind: 'custom' };
@@ -6,7 +7,11 @@ type Selection = { kind: 'preset'; id: 'A' | 'B' | 'C' } | { kind: 'custom' };
 /** The longest of the three proven-effective presets — anything past this risks not fitting. */
 const WARNING_LENGTH = Math.max(...MESSAGE_PRESETS.map((p) => p.text.length));
 
-export function openMessagePickerForm(currentMessage: string, onSave: (message: string) => void): void {
+export function openMessagePickerForm(
+  currentMessage: string,
+  currentFont: string,
+  onSave: (message: string, font: string) => void,
+): void {
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
 
@@ -108,6 +113,38 @@ export function openMessagePickerForm(currentMessage: string, onSave: (message: 
 
   customTextarea.addEventListener('input', updateLengthWarning);
 
+  const fontField = document.createElement('div');
+  fontField.className = 'message-picker__font-field';
+
+  const fontLabel = document.createElement('label');
+  fontLabel.className = 'message-picker__font-label';
+  fontLabel.textContent = 'Handwriting font';
+  fontLabel.htmlFor = 'message-picker-font';
+
+  const fontSelect = document.createElement('select');
+  fontSelect.id = 'message-picker-font';
+  fontSelect.className = 'message-picker__font-select';
+  for (const font of MESSAGE_FONTS) {
+    const option = document.createElement('option');
+    option.value = font.id;
+    option.textContent = font.label;
+    fontSelect.appendChild(option);
+  }
+  fontSelect.value = MESSAGE_FONTS.some((f) => f.id === currentFont) ? currentFont : MESSAGE_FONTS[0].id;
+
+  const fontPreview = document.createElement('p');
+  fontPreview.className = 'message-picker__font-preview';
+  fontPreview.textContent = 'Please vote in the upcoming election!';
+
+  function updateFontPreview(): void {
+    fontPreview.style.fontFamily = getFontFamily(fontSelect.value);
+  }
+  fontSelect.addEventListener('change', updateFontPreview);
+  updateFontPreview();
+
+  fontLabel.appendChild(fontSelect);
+  fontField.append(fontLabel, fontPreview);
+
   const actions = document.createElement('div');
   actions.className = 'form-actions';
 
@@ -133,6 +170,7 @@ export function openMessagePickerForm(currentMessage: string, onSave: (message: 
     customTextarea,
     lengthWarning,
     errorText,
+    fontField,
     actions,
   );
   overlay.appendChild(panel);
@@ -165,7 +203,7 @@ export function openMessagePickerForm(currentMessage: string, onSave: (message: 
       if (!confirmed) return;
     }
 
-    onSave(newMessage);
+    onSave(newMessage, fontSelect.value);
     close();
   }
 

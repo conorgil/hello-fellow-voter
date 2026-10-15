@@ -1,6 +1,7 @@
 import type { Column, ColumnAutomation, ColumnId, Label, Project, StoredState, Voter } from './types';
 import { DEFAULT_COLUMNS } from './types';
 import { DEFAULT_MESSAGE } from './postcardMessages';
+import { DEFAULT_MESSAGE_FONT } from './postcardFonts';
 
 const STORAGE_KEY = 'hello-fellow-voter:v1';
 
@@ -56,6 +57,10 @@ function loadState(): StoredState {
       // Backfill the proven-effective default for any project that never got a
       // message of its own — leaves an already-customized (non-empty) message untouched.
       if (project.message === '') project.message = DEFAULT_MESSAGE;
+      // Older stored state predates the selectable postcard message font.
+      if (typeof project.messageFont !== 'string' || project.messageFont === '') {
+        project.messageFont = DEFAULT_MESSAGE_FONT;
+      }
 
       // Older stored state predates configurable column automation; backfill the
       // equivalent of the old hardcoded Done/Next-voter behavior.
@@ -173,6 +178,7 @@ export function createProject(name: string): Project | null {
     name: name.trim(),
     createdAt: new Date().toISOString(),
     message: DEFAULT_MESSAGE,
+    messageFont: DEFAULT_MESSAGE_FONT,
   };
   state.projects.push(project);
   state.activeProjectId = project.id;
@@ -204,6 +210,20 @@ export function setProjectMessage(id: string, message: string): void {
   const project = state.projects.find((p) => p.id === id);
   if (!project) return;
   project.message = message.trim();
+  saveState(state);
+}
+
+export function getProjectMessageFont(id: string): string {
+  const project = loadState().projects.find((p) => p.id === id);
+  return project?.messageFont ?? DEFAULT_MESSAGE_FONT;
+}
+
+/** Silently no-ops if the project doesn't exist. */
+export function setProjectMessageFont(id: string, fontId: string): void {
+  const state = loadState();
+  const project = state.projects.find((p) => p.id === id);
+  if (!project) return;
+  project.messageFont = fontId;
   saveState(state);
 }
 

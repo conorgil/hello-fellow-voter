@@ -687,8 +687,11 @@ button {
    CSS rotation instead of waiting for the user to physically turn their
    phone — screen.orientation.lock() isn't supported in Safari iOS, so a real
    orientation lock isn't an option, but rotating the box visually gives the
-   same result immediately. */
-@media (max-width: 640px) and (orientation: portrait) {
+   same result immediately. Gated on (hover: none) and (pointer: coarse) —
+   touch-only signals a real phone/tablet — so a laptop window merely resized
+   narrow-and-tall doesn't get rotated sideways; a laptop's trackpad or mouse
+   reports hover:hover/pointer:fine regardless of window size. */
+@media (max-width: 640px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   .overlay--detail {
     inset: auto;
     top: 0;
@@ -704,8 +707,12 @@ button {
    device and the forced rotation above — `orientation` reflects the actual,
    unrotated viewport, so a CSS transform never makes this query's own
    `(orientation: landscape)` branch match, and both conditions are listed
-   explicitly instead of relying on one to imply the other. */
-@media (orientation: landscape) and (max-height: 500px), (max-width: 640px) and (orientation: portrait) {
+   explicitly instead of relying on one to imply the other. Both branches are
+   gated on (hover: none) and (pointer: coarse) — see the forced-rotation
+   rule above for why — so a short/narrow laptop browser window never
+   triggers this mobile-only compact layout. */
+@media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse),
+  (max-width: 640px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   .overlay--detail .detail-panel {
     padding: 0.75rem;
     gap: 0.75rem;
@@ -738,13 +745,14 @@ button {
 
 /* Split from the block above because the unit differs: a real landscape
    viewport is wide in `vw`, while the forced rotation borrows the portrait
-   viewport's *height* as its effective width. */
-@media (orientation: landscape) and (max-height: 500px) {
+   viewport's *height* as its effective width. Gated on (hover: none) and
+   (pointer: coarse) for the same reason as the compact-chrome rule above. */
+@media (orientation: landscape) and (max-height: 500px) and (hover: none) and (pointer: coarse) {
   .overlay--detail .postcard-address__line {
     font-size: clamp(1.1rem, 3.2vw, 2.2rem);
   }
 }
-@media (max-width: 640px) and (orientation: portrait) {
+@media (max-width: 640px) and (orientation: portrait) and (hover: none) and (pointer: coarse) {
   .overlay--detail .postcard-address__line {
     font-size: clamp(1.1rem, 3.2vh, 2.2rem);
   }
@@ -768,7 +776,13 @@ button {
 .detail-panel__close {
   position: absolute;
   top: 0.5rem;
-  right: 0.5rem;
+  /* Now that the modal sits close to the real viewport edge (see
+     .detail-panel's margin), the button would otherwise land inside the
+     fixed, higher-z-index .gh-corner ribbon's hit area (its border-triangle
+     box is a full --gh-corner-size square, not just the visible triangle)
+     and silently swallow the click. Clear it explicitly instead of guessing
+     a magic number. */
+  right: calc(0.5rem + var(--gh-corner-size));
   z-index: 1;
   width: 2rem;
   height: 2rem;
@@ -875,7 +889,7 @@ button {
 
 .postcard__message-placeholder,
 .postcard__message-text {
-  font-family: 'Segoe Script', 'Bradley Hand', 'Apple Chancery', cursive;
+  font-family: 'Patrick Hand', cursive;
   font-size: 1.5rem;
   line-height: 2.5rem;
   white-space: pre-wrap;
@@ -1225,6 +1239,41 @@ button {
 
 .message-picker__textarea:focus {
   outline: 2px solid var(--color-primary);
+}
+
+.message-picker__font-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.message-picker__font-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.message-picker__font-select {
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text);
+  background: var(--color-panel);
+}
+
+.message-picker__font-preview {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 1.3rem;
+  color: var(--color-text);
 }
 
 .confirm-dialog {

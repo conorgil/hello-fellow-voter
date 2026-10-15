@@ -112,6 +112,8 @@ export interface Project {
   name: string;
   createdAt: string;
   message: string;
+  /** id into MESSAGE_FONTS (src/postcardFonts.ts) */
+  messageFont: string;
 }
 
 export interface Voter {
