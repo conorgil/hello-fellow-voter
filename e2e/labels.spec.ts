@@ -143,6 +143,34 @@ test('batch-assigns a label to a multi-selection via the batch toolbar', async (
   ).toBeVisible();
 });
 
+test('shows the batch toolbar and creates a label inline when none exist yet', async ({ page }) => {
+  await addVoter(page, { name: 'Alice Voter', street: '1 Main St', city: 'Town', state: 'TX', zip: '75000' });
+  await addVoter(page, { name: 'Bob Voter', street: '2 Main St', city: 'Town', state: 'TX', zip: '75000' });
+
+  await page.locator('.voter-card', { hasText: 'Alice Voter' }).locator('.voter-card__select').click();
+  await page.locator('.voter-card', { hasText: 'Bob Voter' }).locator('.voter-card__select').click();
+
+  const batchBar = page.locator('.board-batch-bar');
+  await expect(batchBar).toBeVisible();
+  await expect(batchBar).toContainText('2 selected');
+
+  await batchBar.getByRole('button', { name: 'Add/remove labels' }).click();
+  await page.locator('.board-batch-bar .label-picker__search').fill('Batch 1');
+  await page.locator('.board-batch-bar .label-picker__create-row', { hasText: 'Batch 1' }).click();
+  await page.locator('.board-batch-bar .label-picker__create-form .color-swatch').first().click();
+  await page.locator('.board-batch-bar .label-picker__create-form button', { hasText: 'Create' }).click();
+
+  await expect(page.locator('.toast', { hasText: 'Labeled 2 voters' })).toBeVisible();
+  await page.locator('.board-batch-bar button', { hasText: 'Clear selection' }).click();
+
+  await expect(
+    page.locator('.voter-card', { hasText: 'Alice Voter' }).locator('.label-badge', { hasText: 'Batch 1' }),
+  ).toBeVisible();
+  await expect(
+    page.locator('.voter-card', { hasText: 'Bob Voter' }).locator('.label-badge', { hasText: 'Batch 1' }),
+  ).toBeVisible();
+});
+
 test('auto-assigns a label on column entry via drag-and-keyboard move, and via the automation form', async ({
   page,
 }) => {

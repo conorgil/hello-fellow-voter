@@ -244,7 +244,7 @@ export function renderBoardView(container: HTMLElement, project: Project, rerend
   // --- Batch label toolbar ---
   const selectedCount = getSelectedCount();
   let batchBar: HTMLElement | null = null;
-  if (selectedCount > 0 && labels.length > 0) {
+  if (selectedCount > 0) {
     batchBar = document.createElement('div');
     batchBar.className = 'board-batch-bar';
 
