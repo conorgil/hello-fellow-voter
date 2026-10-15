@@ -59,6 +59,7 @@ function makeVoter(projectId: string, status: string, order: number, overrides: 
     zip: '19104',
     status,
     order,
+    importNumber: order + 1,
     createdAt: new Date().toISOString(),
     labelIds: [],
     ...overrides,

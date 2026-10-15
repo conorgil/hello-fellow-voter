@@ -126,6 +126,13 @@ export interface Voter {
   zip: string;
   status: ColumnId;
   order: number;
+  /**
+   * 1-based position in the order this voter was first added to the project (by import
+   * or manual add). Unlike `order`, which is per-column and changes as a voter moves
+   * across the board, this never changes after creation — a stable handle for export
+   * features that need to reference "voter #N" independent of status or board position.
+   */
+  importNumber: number;
   createdAt: string;
   labelIds: string[];
 }

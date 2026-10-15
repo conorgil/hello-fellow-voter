@@ -42,6 +42,22 @@ function loadState(): StoredState {
     for (const voter of parsed.voters) {
       if (!Array.isArray(voter.labelIds)) voter.labelIds = [];
     }
+    // Older stored state predates import numbers; backfill from array order, which
+    // reflects original add order since voters are only ever appended, never reordered
+    // in place. Seeds each project's counter from any already-numbered voters first, in
+    // case a project is only partially backfilled.
+    const maxImportNumberByProject = new Map<string, number>();
+    for (const voter of parsed.voters) {
+      if (typeof voter.importNumber !== 'number') continue;
+      const current = maxImportNumberByProject.get(voter.projectId) ?? 0;
+      maxImportNumberByProject.set(voter.projectId, Math.max(current, voter.importNumber));
+    }
+    for (const voter of parsed.voters) {
+      if (typeof voter.importNumber === 'number') continue;
+      const next = (maxImportNumberByProject.get(voter.projectId) ?? 0) + 1;
+      maxImportNumberByProject.set(voter.projectId, next);
+      voter.importNumber = next;
+    }
     // Older stored state predates customizable columns; backfill the same defaults every board used to show.
     if (!parsed.columns) parsed.columns = {};
     // Older stored state predates labels entirely.
@@ -397,6 +413,14 @@ function nextOrderInColumn(voters: Voter[], projectId: string, status: ColumnId)
   return columnVoters.length === 0 ? 0 : Math.max(...columnVoters.map((v) => v.order)) + 1;
 }
 
+/** The import number to assign to the next voter added to a project, continuing the
+ * project's existing sequence (or starting at 1 if it has no voters yet). Exported so
+ * bulk import, which assigns a run of these in one pass, can seed its own counter. */
+export function startingImportNumber(voters: Voter[], projectId: string): number {
+  const projectVoters = voters.filter((v) => v.projectId === projectId);
+  return projectVoters.length === 0 ? 1 : Math.max(...projectVoters.map((v) => v.importNumber)) + 1;
+}
+
 export interface NewVoterInput {
   name: string;
   street: string;
@@ -418,6 +442,7 @@ export function addVoter(projectId: string, input: NewVoterInput): Voter {
     zip: input.zip.trim(),
     status: firstColumnId,
     order: nextOrderInColumn(state.voters, projectId, firstColumnId),
+    importNumber: startingImportNumber(state.voters, projectId),
     createdAt: new Date().toISOString(),
     labelIds: [],
   };

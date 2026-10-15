@@ -13,6 +13,7 @@ function makeVoter(overrides: Partial<Voter>): Voter {
     zip: '62704',
     status: 'todo',
     order: 0,
+    importNumber: 1,
     createdAt: '2026-01-01T00:00:00.000Z',
     labelIds: [],
     ...overrides,

@@ -594,6 +594,91 @@ describe('labels migration backfill', () => {
   });
 });
 
+describe('import number migration backfill', () => {
+  it('assigns sequential import numbers, in array order, to pre-existing voters that have none', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-project', name: 'Legacy Project', createdAt: '2025-01-01T00:00:00.000Z' }],
+      activeProjectId: 'legacy-project',
+      voters: [
+        {
+          id: 'legacy-voter-1',
+          projectId: 'legacy-project',
+          name: 'First Voter',
+          street: '1 Legacy St',
+          city: 'X',
+          state: 'NY',
+          zip: '10001',
+          status: 'todo',
+          order: 0,
+          createdAt: '2025-01-01T00:00:00.000Z',
+          labelIds: [],
+        },
+        {
+          id: 'legacy-voter-2',
+          projectId: 'legacy-project',
+          name: 'Second Voter',
+          street: '2 Legacy St',
+          city: 'X',
+          state: 'NY',
+          zip: '10002',
+          status: 'todo',
+          order: 1,
+          createdAt: '2025-01-01T00:00:00.000Z',
+          labelIds: [],
+        },
+      ],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    const voters = getVotersForProject('legacy-project');
+    expect(voters.map((v) => v.importNumber)).toEqual([1, 2]);
+  });
+
+  it('seeds the backfill counter from any already-numbered voters, so a partially-numbered project never duplicates a number', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-project', name: 'Legacy Project', createdAt: '2025-01-01T00:00:00.000Z' }],
+      activeProjectId: 'legacy-project',
+      voters: [
+        {
+          id: 'legacy-voter-1',
+          projectId: 'legacy-project',
+          name: 'First Voter',
+          street: '1 Legacy St',
+          city: 'X',
+          state: 'NY',
+          zip: '10001',
+          status: 'todo',
+          order: 0,
+          importNumber: 5,
+          createdAt: '2025-01-01T00:00:00.000Z',
+          labelIds: [],
+        },
+        {
+          id: 'legacy-voter-2',
+          projectId: 'legacy-project',
+          name: 'Second Voter',
+          street: '2 Legacy St',
+          city: 'X',
+          state: 'NY',
+          zip: '10002',
+          status: 'todo',
+          order: 1,
+          createdAt: '2025-01-01T00:00:00.000Z',
+          labelIds: [],
+        },
+      ],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    const voters = getVotersForProject('legacy-project');
+    expect(voters.map((v) => v.importNumber)).toEqual([5, 6]);
+  });
+});
+
 describe('labels CRUD', () => {
   it('creates, lists, and rejects a duplicate (case-insensitive) label name', () => {
     const project = mustCreateProject('Labels Project');

@@ -1,4 +1,4 @@
-import { addVoters, dedupeKey, getColumns, getVotersForProject, moveVoter } from '../storage';
+import { addVoters, dedupeKey, getColumns, getVotersForProject, moveVoter, startingImportNumber } from '../storage';
 import type { Column, Voter } from '../types';
 import { extractAllLines } from './extractLines';
 import { parseHfvExportLines } from './parseHfvExport';
@@ -55,6 +55,7 @@ export function importRecords(
   let imported = 0;
   let duplicates = 0;
   let statusUpdated = 0;
+  let nextImportNumber = startingImportNumber(existingVoters, projectId);
 
   for (const record of records) {
     const key = dedupeKey(projectId, record.name, record.street, record.city, record.state, record.zip);
@@ -85,6 +86,7 @@ export function importRecords(
       zip: record.zip,
       status,
       order: reserveOrder(status),
+      importNumber: nextImportNumber++,
       createdAt: new Date().toISOString(),
       labelIds: [],
     };
