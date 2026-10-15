@@ -66,10 +66,6 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   closeBtn.addEventListener('click', close);
   attachTextTooltip(closeBtn, 'Closes address view without any automations', 400);
 
-  const closeRow = document.createElement('div');
-  closeRow.className = 'detail-panel__close-row';
-  closeRow.appendChild(closeBtn);
-
   const postcardFrame = document.createElement('div');
   postcardFrame.className = 'postcard-frame';
 
@@ -341,7 +337,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     footerActions.append(advanceBtn);
   }
 
-  panel.append(closeRow, postcardFrame, footer);
+  panel.append(closeBtn, postcardFrame, footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
