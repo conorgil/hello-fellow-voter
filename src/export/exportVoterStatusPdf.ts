@@ -93,6 +93,11 @@ export function buildVoterStatusPdfDoc(project: Project, voters: Voter[]): jsPDF
     body: exportRows.map((row) => [row.name, row.street, row.city, row.state, row.zip, row.status]),
     didDrawCell: (data) => {
       if (data.section !== 'body' || data.column.index !== data.table.columns.length - 1) return;
+      // A row whose wrapped cell content doesn't fit before a page break gets split by
+      // jspdf-autotable into two draws: the original (real index) and a continuation
+      // fragment re-run through this same hook with index -1 — skip it, since the
+      // original draw already emitted this row's marker.
+      if (data.row.index < 0) return;
       const row = exportRows[data.row.index];
       const payload = [HFV_MARKER, row.name, row.street, row.city, row.state, row.zip, row.status].join(
         FIELD_SEPARATOR,
