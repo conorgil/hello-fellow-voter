@@ -1,7 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { resetApp, createProject, openAutomationForm, addVoter, openVoterDetail } from './helpers';
 
-test.use({ viewport: { width: 390, height: 844 } });
+// hasTouch/isMobile matter beyond just emulating a phone realistically: the
+// detail view's auto-rotation and compact-chrome CSS (see style.css) are
+// gated on `(hover: none) and (pointer: coarse)` specifically so a laptop
+// browser window resized to these same dimensions doesn't get rotated too —
+// so this viewport alone, without touch emulation, no longer triggers it.
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
 test('modals fill the viewport edge-to-edge on mobile', async ({ page }) => {
   await resetApp(page);
