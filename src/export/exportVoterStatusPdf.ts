@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { FIELD_SEPARATOR, HFV_MARKER } from '../pdf/parseHfvExport';
 import { getColumns } from '../storage';
 import type { Project, Voter } from '../types';
 import { buildExportRows, summarizeByStatus } from './buildExportRows';
@@ -7,6 +8,12 @@ import { buildExportRows, summarizeByStatus } from './buildExportRows';
 const PAGE_MARGIN = 40;
 const SITE_URL = 'https://hellofellowvoter.com';
 const LINK_COLOR: [number, number, number] = [37, 99, 235];
+/**
+ * Vertical offset (pt) of the invisible per-row marker above its row's visible text —
+ * just enough to land on its own baseline so `groupItemsIntoLines` (2pt Y tolerance)
+ * never merges it with the visible row, while staying inside this row's own band.
+ */
+const HFV_MARKER_Y_OFFSET = 3;
 
 function slugify(name: string): string {
   return name
@@ -23,10 +30,22 @@ function localDateStamp(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function exportVoterStatusPdf(project: Project, voters: Voter[]): void {
+/**
+ * Builds the voter status report PDF. Split out from `exportVoterStatusPdf` so the
+ * generated document's bytes can be inspected/tested (e.g. round-tripped back through
+ * the importer) without triggering a browser download.
+ *
+ * Alongside the visible table, each row also gets an invisible HFV-EXPORT-V1 record
+ * (see docs/pdf-import-format.md) so this exact PDF can be deterministically
+ * re-imported later — e.g. by a team leader collecting status reports back from
+ * volunteers — instead of relying on parsing the visible table's layout, which
+ * `jspdf-autotable` can wrap across multiple lines for long cell contents.
+ */
+export function buildVoterStatusPdfDoc(project: Project, voters: Voter[]): jsPDF {
   const columns = getColumns(project.id);
   const now = new Date();
-  const doc = new jsPDF({ unit: 'pt' });
+  const doc = new jsPDF({ unit: 'pt', compress: true });
+  doc.setProperties({ keywords: 'hello-fellow-voter-export; format=voter-status; version=1' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const textWidth = pageWidth - PAGE_MARGIN * 2;
 
@@ -65,19 +84,31 @@ export function exportVoterStatusPdf(project: Project, voters: Voter[]): void {
   doc.text(generatedOn, PAGE_MARGIN, introBottom + 16);
   doc.text(summarizeByStatus(voters, columns), PAGE_MARGIN, introBottom + 32);
 
+  const exportRows = buildExportRows(voters, columns);
+
   autoTable(doc, {
     startY: introBottom + 48,
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
     head: [['Name', 'Street', 'City', 'State', 'ZIP', 'Status']],
-    body: buildExportRows(voters, columns).map((row) => [
-      row.name,
-      row.street,
-      row.city,
-      row.state,
-      row.zip,
-      row.status,
-    ]),
+    body: exportRows.map((row) => [row.name, row.street, row.city, row.state, row.zip, row.status]),
+    didDrawCell: (data) => {
+      if (data.section !== 'body' || data.column.index !== data.table.columns.length - 1) return;
+      const row = exportRows[data.row.index];
+      const payload = [HFV_MARKER, row.name, row.street, row.city, row.state, row.zip, row.status].join(
+        FIELD_SEPARATOR,
+      );
+      // Kept within the page's bounds (unlike a position past the right margin) —
+      // pdf.js's text extraction silently drops glyphs positioned outside the page.
+      doc.text(payload, PAGE_MARGIN, data.cell.y + data.cell.height / 2 - HFV_MARKER_Y_OFFSET, {
+        renderingMode: 'invisible',
+      });
+    },
   });
 
-  doc.save(`${slugify(project.name)}-voter-status-${localDateStamp(now)}.pdf`);
+  return doc;
+}
+
+export function exportVoterStatusPdf(project: Project, voters: Voter[]): void {
+  const doc = buildVoterStatusPdfDoc(project, voters);
+  doc.save(`${slugify(project.name)}-voter-status-${localDateStamp(new Date())}.pdf`);
 }

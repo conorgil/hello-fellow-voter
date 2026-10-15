@@ -5,6 +5,11 @@ export function formatImportMessage(result: ImportResult): string {
   if (result.duplicateCount > 0) {
     parts.push(`${result.duplicateCount} duplicate${result.duplicateCount === 1 ? '' : 's'} skipped.`);
   }
+  if (result.statusUpdatedCount > 0) {
+    parts.push(
+      `Updated status for ${result.statusUpdatedCount} already-imported voter${result.statusUpdatedCount === 1 ? '' : 's'}.`,
+    );
+  }
   if (result.skippedCount > 0) {
     parts.push(
       `${result.skippedCount} line${result.skippedCount === 1 ? '' : 's'} couldn't be parsed and ${

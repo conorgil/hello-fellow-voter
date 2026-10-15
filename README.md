@@ -53,6 +53,8 @@ This is a static, framework-free TypeScript app built with [Vite](https://vitejs
 
 Because everything is static, the app is deployed to GitHub Pages automatically on every push to `main`.
 
+Status-report PDFs this app generates also embed a hidden, versioned record per voter so they can be re-imported deterministically later (e.g. by a team leader collecting reports back from volunteers) — see [`docs/pdf-import-format.md`](docs/pdf-import-format.md) if you maintain another tool and want your own exports to be reliably importable too.
+
 ## A note on scope
 
 This app is an independent volunteer productivity tool and isn't affiliated with any specific GOTV organization. It just helps you stay organized while you write postcards for whichever campaign or organization you're volunteering with — remember to report your finished postcards back to that organization directly, since this app never contacts them for you.
