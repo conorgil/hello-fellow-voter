@@ -15,7 +15,8 @@
     "@formkit/drag-and-drop": "^0.6.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
-    "pdfjs-dist": "^4.6.82"
+    "pdfjs-dist": "^4.6.82",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

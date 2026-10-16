@@ -29,7 +29,7 @@ export function renderProjectList(container: HTMLElement, rerender: () => void):
   if (projects.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'project-list-empty';
-    empty.textContent = 'No projects yet. Create one to import a voter list PDF and start writing.';
+    empty.textContent = 'No projects yet. Create one to import a voter list and start writing.';
     list.appendChild(empty);
   }
 

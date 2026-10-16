@@ -1,8 +1,24 @@
 import { addVoters, dedupeKey, getColumns, getVotersForProject, moveVoter, startingImportNumber } from '../storage';
 import type { Column, Voter } from '../types';
-import { extractAllLines } from './extractLines';
+import { extractAllLines, type PdfImportProgressCallback } from './extractLines';
 import { parseHfvExportLines } from './parseHfvExport';
 import { looksLikeDataRow, looksLikeSuspectedAddress, parseVoterLine, type ParsedRecord } from './parseVoterLine';
+
+// Generous headroom above the real-world 19.5MB sample this feature was built
+// against — guards against reading a pathologically large file into memory at all.
+export const MAX_PDF_FILE_SIZE_BYTES = 150 * 1024 * 1024;
+
+export class PdfTooLargeError extends Error {
+  constructor(
+    public readonly sizeBytes: number,
+    public readonly limitBytes: number,
+  ) {
+    super(
+      `This PDF is ${(sizeBytes / 1024 / 1024).toFixed(1)}MB, over the ${(limitBytes / 1024 / 1024).toFixed(0)}MB limit for import.`,
+    );
+    this.name = 'PdfTooLargeError';
+  }
+}
 
 /** A plain `ParsedRecord` from the heuristic parser has no status; an `HfvExportRecord`
  * from our own export format carries the column label it was exported with. */
@@ -100,11 +116,19 @@ export function importRecords(
   return { importedCount: imported, duplicateCount: duplicates, statusUpdatedCount: statusUpdated, skippedCount, suspectedLines };
 }
 
-export async function importPdf(projectId: string, file: File): Promise<ImportResult> {
-  const buf = await file.arrayBuffer();
-  const lines = await extractAllLines(buf);
+export async function importPdf(
+  projectId: string,
+  file: File,
+  onProgress?: PdfImportProgressCallback,
+): Promise<ImportResult> {
+  if (file.size > MAX_PDF_FILE_SIZE_BYTES) {
+    throw new PdfTooLargeError(file.size, MAX_PDF_FILE_SIZE_BYTES);
+  }
 
-  const hfvRecords = parseHfvExportLines(lines);
+  const buf = await file.arrayBuffer();
+  const lines = await extractAllLines(buf, onProgress);
+
+  const hfvRecords = parseHfvExportLines(lines.map((l) => l.line));
   if (hfvRecords.length > 0) {
     return importRecords(projectId, hfvRecords);
   }
@@ -113,9 +137,17 @@ export async function importPdf(projectId: string, file: File): Promise<ImportRe
   const suspectedLines: string[] = [];
   let skipped = 0;
 
-  for (const line of lines) {
+  for (const { line, sourcedFromOcr } of lines) {
     if (!looksLikeDataRow(line)) {
-      if (looksLikeSuspectedAddress(line)) suspectedLines.push(line);
+      // OCR can misread exactly the characters the address heuristics key off
+      // (a ZIP digit, a state letter) in a way pdf.js's exact text-layer
+      // extraction essentially never does — so for OCR'd pages, flag every
+      // non-empty unparsed line for human review, not just the ones that
+      // already look loosely address-shaped, rather than silently losing a
+      // voter to one bad character.
+      if (looksLikeSuspectedAddress(line) || (sourcedFromOcr && line.trim() !== '')) {
+        suspectedLines.push(line);
+      }
       continue; // header/footer/front-matter — not a failure
     }
 

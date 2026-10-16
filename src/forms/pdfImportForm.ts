@@ -1,6 +1,7 @@
-import { importPdf } from '../pdf/importPdf';
+import { importPdf, PdfTooLargeError } from '../pdf/importPdf';
+import { OcrPageLimitExceededError } from '../pdf/ocr';
 import { addToSuspectQueue, getSuspectQueue } from '../storage';
-import { formatImportMessage } from '../ui/importMessage';
+import { formatImportMessage, formatImportProgressMessage } from '../ui/importMessage';
 import { showToast } from '../ui/toast';
 import { openReviewSuspectsForm } from './reviewSuspectsForm';
 
@@ -85,8 +86,22 @@ export function openPdfImportForm(projectId: string, rerender: () => void): void
   });
 
   async function handleFile(file: File): Promise<void> {
+    dropZone.replaceChildren();
+    const progressText = document.createElement('p');
+    progressText.className = 'pdf-drop-zone__text';
+    progressText.textContent = 'Reading PDF…';
+    dropZone.appendChild(progressText);
+    browseBtn.disabled = true;
+
     try {
-      const result = await importPdf(projectId, file);
+      const result = await importPdf(projectId, file, (progress) => {
+        progressText.textContent = formatImportProgressMessage(progress);
+      });
+      // The user may have dismissed the dialog while this ran — the import
+      // above has already written to storage either way, but skip the UI
+      // feedback below (toast/rerender/review dialog) rather than target a
+      // detached panel.
+      if (!overlay.isConnected) return;
       close();
       showToast(formatImportMessage(result), 'success');
       addToSuspectQueue(projectId, result.suspectedLines);
@@ -95,8 +110,15 @@ export function openPdfImportForm(projectId: string, rerender: () => void): void
         openReviewSuspectsForm(projectId, rerender);
       }
     } catch (err) {
-      console.error(err);
-      showToast('Could not read this PDF. Please check the file and try again.', 'error');
+      if (!overlay.isConnected) return;
+      dropZone.replaceChildren(dropText, orText, browseBtn, fileInput);
+      browseBtn.disabled = false;
+      if (err instanceof PdfTooLargeError || err instanceof OcrPageLimitExceededError) {
+        showToast(err.message, 'error');
+      } else {
+        console.error(err);
+        showToast('Could not read this PDF. Please check the file and try again.', 'error');
+      }
     }
   }
 

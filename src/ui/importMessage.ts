@@ -1,4 +1,14 @@
+import type { PdfImportProgress } from '../pdf/extractLines';
 import type { ImportResult } from '../pdf/importPdf';
+
+export function formatImportProgressMessage(progress: PdfImportProgress): string {
+  if (progress.phase === 'ocr-setup') return 'Preparing OCR engine for scanned pages…';
+  if (progress.phase === 'ocr') {
+    const percent = Math.round((progress.ocrProgress ?? 0) * 100);
+    return `Scanning page ${progress.page} of ${progress.totalPages} (${percent}%)…`;
+  }
+  return `Reading page ${progress.page} of ${progress.totalPages}…`;
+}
 
 export function formatImportMessage(result: ImportResult): string {
   const parts = [`Imported ${result.importedCount} new voter${result.importedCount === 1 ? '' : 's'}.`];
