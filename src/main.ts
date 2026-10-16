@@ -15,12 +15,34 @@ const app: HTMLDivElement =
   })();
 
 function render(): void {
+  const board = app.querySelector<HTMLElement>('.board');
+  const scrollLeft = board?.scrollLeft ?? 0;
+  const columnScrollTops = new Map<string, number>();
+  if (board) {
+    for (const col of board.querySelectorAll<HTMLElement>('.column')) {
+      const body = col.querySelector<HTMLElement>('.column__body');
+      if (col.dataset.columnId && body) {
+        columnScrollTops.set(col.dataset.columnId, body.scrollTop);
+      }
+    }
+  }
+
   app.innerHTML = '';
   const activeProject = getActiveProject();
   if (!activeProject) {
     renderProjectList(app, render);
   } else {
     renderBoardView(app, activeProject, render);
+  }
+
+  const newBoard = app.querySelector<HTMLElement>('.board');
+  if (newBoard) {
+    newBoard.scrollLeft = scrollLeft;
+    for (const col of newBoard.querySelectorAll<HTMLElement>('.column')) {
+      const body = col.querySelector<HTMLElement>('.column__body');
+      const savedTop = col.dataset.columnId ? columnScrollTops.get(col.dataset.columnId) : undefined;
+      if (body && savedTop !== undefined) body.scrollTop = savedTop;
+    }
   }
 }
 
