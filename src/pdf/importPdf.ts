@@ -15,6 +15,8 @@ export interface ImportResult {
   statusUpdatedCount: number;
   skippedCount: number;
   suspectedLines: string[];
+  /** Ids of the newly created voters, so a caller can offer to label them right after import. */
+  importedVoterIds: string[];
 }
 
 function findColumnByLabel(columns: Column[], label: string | undefined): Column | undefined {
@@ -97,7 +99,14 @@ export function importRecords(
 
   addVoters(newVoters);
 
-  return { importedCount: imported, duplicateCount: duplicates, statusUpdatedCount: statusUpdated, skippedCount, suspectedLines };
+  return {
+    importedCount: imported,
+    duplicateCount: duplicates,
+    statusUpdatedCount: statusUpdated,
+    skippedCount,
+    suspectedLines,
+    importedVoterIds: newVoters.map((v) => v.id),
+  };
 }
 
 export async function importPdf(projectId: string, file: File): Promise<ImportResult> {

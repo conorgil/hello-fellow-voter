@@ -1,7 +1,6 @@
 import { importPastedText } from '../pdf/importPastedText';
 import { addToSuspectQueue, getSuspectQueue } from '../storage';
-import { showToast } from '../ui/toast';
-import { formatImportMessage } from '../ui/importMessage';
+import { renderResultsPhase } from './importResultPanel';
 import { openReviewSuspectsForm } from './reviewSuspectsForm';
 
 export function openPasteImportForm(projectId: string, rerender: () => void): void {
@@ -44,16 +43,23 @@ export function openPasteImportForm(projectId: string, rerender: () => void): vo
 
   actions.append(cancelBtn, importBtn);
 
-  // Cancel/Import live outside this scrollable area so they stay visible even
-  // when the textarea content overflows the panel's max height.
+  // Cancel/Import (and later Done) live outside this scrollable area so they
+  // stay visible even when the content overflows the panel's max height.
   const scrollArea = document.createElement('div');
   scrollArea.className = 'form-panel__scroll';
-  scrollArea.append(title, hint, textareaField);
+  scrollArea.append(hint, textareaField);
 
-  form.append(scrollArea, actions);
+  // Title lives outside the scrollable area too, so it never scrolls out of view.
+  form.append(title, scrollArea, actions);
   panel.append(form);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
+
+  // Importing pasted text is synchronous, so there's no in-progress phase to
+  // guard against dismissal — only the results phase needs Escape/outside
+  // click to act as Done instead of a plain close.
+  let dismissible = true;
+  let dismissAction: () => void = close;
 
   function close(): void {
     overlay.remove();
@@ -61,24 +67,28 @@ export function openPasteImportForm(projectId: string, rerender: () => void): vo
   }
 
   function onKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape' && dismissible) dismissAction();
   }
   document.addEventListener('keydown', onKeydown);
 
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) close();
+    if (e.target === overlay && dismissible) dismissAction();
   });
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const result = importPastedText(projectId, textarea.value);
+  function onDone(): void {
     close();
-    showToast(formatImportMessage(result), 'success');
-    addToSuspectQueue(projectId, result.suspectedLines);
     rerender();
     if (getSuspectQueue(projectId).length > 0) {
       openReviewSuspectsForm(projectId, rerender);
     }
+  }
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const result = importPastedText(projectId, textarea.value);
+    addToSuspectQueue(projectId, result.suspectedLines);
+    dismissAction = onDone;
+    renderResultsPhase(title, scrollArea, actions, projectId, result, rerender, onDone);
   });
 
   textarea.focus();

@@ -1281,10 +1281,21 @@ button {
 
 .paste-import-panel {
   width: min(560px, 90vw);
+  /* Fixed regardless of phase (picking/importing/results/error) or how many
+     voters were imported, so the modal doesn't visibly resize mid-flow. */
+  height: min(560px, 80vh);
 }
 
 .pdf-import-panel {
   width: min(480px, 90vw);
+  height: min(480px, 80vh);
+}
+
+/* The label picker in an import-results modal lives in the actions row
+   alongside Done; margin-right: auto keeps it pinned to the left while
+   .form-actions's own flex-end keeps Done pinned to the right. */
+.form-actions .label-picker {
+  margin-right: auto;
 }
 
 .automation-panel {
@@ -1665,6 +1676,44 @@ button {
   color: var(--color-text-muted);
   font-size: 0.85rem;
   margin: 0;
+}
+
+.import-importing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2.5rem 1.5rem;
+}
+
+.import-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: import-spinner-spin 0.8s linear infinite;
+}
+
+@keyframes import-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.import-status-text {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.import-result-summary {
+  margin: 0 0 1rem;
+  line-height: 1.5;
+}
+
+.import-result-labels {
+  margin-bottom: 0.5rem;
 }
 
 .paste-import-hint,

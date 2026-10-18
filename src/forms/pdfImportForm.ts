@@ -1,7 +1,7 @@
-import { importPdf } from '../pdf/importPdf';
+import { importPdf, type ImportResult } from '../pdf/importPdf';
 import { addToSuspectQueue, getSuspectQueue } from '../storage';
-import { formatImportMessage } from '../ui/importMessage';
 import { showToast } from '../ui/toast';
+import { renderErrorPhase, renderImportingPhase, renderResultsPhase } from './importResultPanel';
 import { openReviewSuspectsForm } from './reviewSuspectsForm';
 
 function isPdfFile(file: File): boolean {
@@ -52,13 +52,14 @@ export function openPdfImportForm(projectId: string, rerender: () => void): void
 
   actions.append(cancelBtn);
 
-  // Cancel lives outside this scrollable area so it stays visible even when
-  // the drop zone overflows the panel's max height.
+  // Cancel (and later Done/Close) lives outside this scrollable area so it
+  // stays visible even when the content overflows the panel's max height.
   const scrollArea = document.createElement('div');
   scrollArea.className = 'form-panel__scroll';
-  scrollArea.append(title, dropZone);
+  scrollArea.append(dropZone);
 
-  panel.append(scrollArea, actions);
+  // Title lives outside the scrollable area too, so it never scrolls out of view.
+  panel.append(title, scrollArea, actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
@@ -91,19 +92,46 @@ export function openPdfImportForm(projectId: string, rerender: () => void): void
     void handleFile(file);
   });
 
+  // While importing, the modal can't be dismissed (there's no way to cancel
+  // an in-flight import) — once results or an error are shown, Escape/an
+  // outside click are equivalent to the phase's own primary button.
+  let dismissible = true;
+  let dismissAction: () => void = close;
+
   async function handleFile(file: File): Promise<void> {
+    dismissible = false;
+    renderImportingPhase(title, scrollArea, actions, 'Importing voters from a PDF');
+
     try {
       const result = await importPdf(projectId, file);
-      close();
-      showToast(formatImportMessage(result), 'success');
-      addToSuspectQueue(projectId, result.suspectedLines);
-      rerender();
-      if (getSuspectQueue(projectId).length > 0) {
-        openReviewSuspectsForm(projectId, rerender);
-      }
+      onImported(result);
     } catch (err) {
       console.error(err);
-      showToast('Could not read this PDF. Please check the file and try again.', 'error');
+      dismissible = true;
+      dismissAction = close;
+      renderErrorPhase(
+        title,
+        scrollArea,
+        actions,
+        'Import failed',
+        'Could not read this PDF. Please check the file and try again.',
+        close,
+      );
+    }
+  }
+
+  function onImported(result: ImportResult): void {
+    addToSuspectQueue(projectId, result.suspectedLines);
+    dismissible = true;
+    dismissAction = onDone;
+    renderResultsPhase(title, scrollArea, actions, projectId, result, rerender, onDone);
+  }
+
+  function onDone(): void {
+    close();
+    rerender();
+    if (getSuspectQueue(projectId).length > 0) {
+      openReviewSuspectsForm(projectId, rerender);
     }
   }
 
@@ -113,11 +141,11 @@ export function openPdfImportForm(projectId: string, rerender: () => void): void
   }
 
   function onKeydown(e: KeyboardEvent): void {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape' && dismissible) dismissAction();
   }
   document.addEventListener('keydown', onKeydown);
 
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) close();
+    if (e.target === overlay && dismissible) dismissAction();
   });
 }
