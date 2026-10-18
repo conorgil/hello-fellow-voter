@@ -67,7 +67,7 @@ function splitByCommaHeuristic(beforeTail: string): { name: string; street: stri
  * caller can fix up a garbled name in the UI, but can't recover a voter that
  * was never imported at all.
  */
-function buildRecord(beforeTail: string, city: string, state: string, zip: string): ParsedRecord | null {
+export function buildRecord(beforeTail: string, city: string, state: string, zip: string): ParsedRecord | null {
   if (!beforeTail) return null;
   const split = splitBySpaceHeuristic(beforeTail) ?? splitByCommaHeuristic(beforeTail);
   const { name, street } = split ?? { name: beforeTail.replace(/,\s*$/, ''), street: '' };
@@ -136,4 +136,52 @@ const SUSPECT_STREET_START = /^\d+\s+\S+.*[A-Za-z]{2,}/;
 export function looksLikeSuspectedAddress(rawLine: string): boolean {
   const trimmed = rawLine.trim();
   return SUSPECT_STATE_ZIP.test(trimmed) || SUSPECT_STREET_START.test(trimmed);
+}
+
+// Matches a line that is *entirely* "City[,] ST ZIP" with nothing else on it —
+// unlike TAIL (which anchors only the end of a line that may have name/street
+// before it on the same line), this requires the whole trimmed line to be just
+// the tail. Used when a record's city/state/zip occupies its own dedicated
+// line in a multi-line layout, where some sources omit the comma entirely
+// (e.g. "Philadelphia PA 19104").
+const WHOLE_LINE_TAIL = /^([A-Za-z .'-]+?),?\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/;
+
+/** True if `line`, taken entirely on its own, is just a City[,] ST ZIP tail —
+ * used to recognize the closing line of a multi-line record. */
+export function isStandaloneAddressTail(line: string): boolean {
+  return WHOLE_LINE_TAIL.test(line.trim());
+}
+
+/**
+ * Block-aware version of `looksLikeDataRow`: a single-line block defers to the
+ * existing single-line check (unchanged behavior); a multi-line block closes
+ * when its last line, alone, is a complete address tail.
+ */
+export function looksLikeDataBlock(lines: string[]): boolean {
+  if (lines.length === 1) return looksLikeDataRow(lines[0]);
+  return isStandaloneAddressTail(lines[lines.length - 1]);
+}
+
+/**
+ * Block-aware version of `parseVoterLine`: a single-line block defers to the
+ * existing single-line parser (unchanged behavior). A multi-line block's last
+ * line must stand alone as a City[,] ST ZIP tail; everything before it (joined
+ * into one string) is run through the same name/street split heuristics
+ * `buildRecord` already uses for a single combined line.
+ */
+export function parseVoterBlock(lines: string[]): ParsedRecord | null {
+  if (lines.length === 1) return parseLine(lines[0]);
+
+  const last = lines[lines.length - 1].trim();
+  const match = WHOLE_LINE_TAIL.exec(last);
+  if (!match) return null;
+
+  const [, city, state, zip] = match;
+  const beforeTail = lines
+    .slice(0, -1)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join(' ');
+
+  return buildRecord(beforeTail, city.trim(), state, zip);
 }

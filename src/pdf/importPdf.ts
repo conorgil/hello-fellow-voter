@@ -1,8 +1,8 @@
 import { addVoters, dedupeKey, getColumns, getVotersForProject, moveVoter, startingImportNumber } from '../storage';
 import type { Column, Voter } from '../types';
-import { extractAllLines } from './extractLines';
+import { extractVoterText } from './extractRecordBlocks';
 import { parseHfvExportLines } from './parseHfvExport';
-import { looksLikeDataRow, looksLikeSuspectedAddress, parseVoterLine, type ParsedRecord } from './parseVoterLine';
+import { looksLikeDataBlock, looksLikeSuspectedAddress, parseVoterBlock, type ParsedRecord } from './parseVoterLine';
 
 /** A plain `ParsedRecord` from the heuristic parser has no status; an `HfvExportRecord`
  * from our own export format carries the column label it was exported with. */
@@ -102,9 +102,9 @@ export function importRecords(
 
 export async function importPdf(projectId: string, file: File): Promise<ImportResult> {
   const buf = await file.arrayBuffer();
-  const lines = await extractAllLines(buf);
+  const { allLines, blocks, discardedLines } = await extractVoterText(buf);
 
-  const hfvRecords = parseHfvExportLines(lines);
+  const hfvRecords = parseHfvExportLines(allLines);
   if (hfvRecords.length > 0) {
     return importRecords(projectId, hfvRecords);
   }
@@ -113,18 +113,23 @@ export async function importPdf(projectId: string, file: File): Promise<ImportRe
   const suspectedLines: string[] = [];
   let skipped = 0;
 
-  for (const line of lines) {
-    if (!looksLikeDataRow(line)) {
-      if (looksLikeSuspectedAddress(line)) suspectedLines.push(line);
+  for (const block of blocks) {
+    if (!looksLikeDataBlock(block)) {
+      const text = block.join(' ');
+      if (looksLikeSuspectedAddress(text)) suspectedLines.push(text);
       continue; // header/footer/front-matter — not a failure
     }
 
-    const record = parseVoterLine(line);
+    const record = parseVoterBlock(block);
     if (!record) {
       skipped++;
       continue;
     }
     records.push(record);
+  }
+
+  for (const line of discardedLines) {
+    if (looksLikeSuspectedAddress(line)) suspectedLines.push(line);
   }
 
   return importRecords(projectId, records, skipped, suspectedLines);

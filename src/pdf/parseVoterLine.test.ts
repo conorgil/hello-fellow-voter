@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { looksLikeDataRow, looksLikeSuspectedAddress, parseVoterLine } from './parseVoterLine';
+import {
+  isStandaloneAddressTail,
+  looksLikeDataRow,
+  looksLikeSuspectedAddress,
+  parseVoterBlock,
+  parseVoterLine,
+} from './parseVoterLine';
 
 const cases: Array<[string, ReturnType<typeof parseVoterLine>]> = [
   [
@@ -138,5 +144,64 @@ describe('parseVoterLine fallback for unrecognized name/street conventions', () 
       state: 'CA',
       zip: '90001',
     });
+  });
+});
+
+describe('isStandaloneAddressTail', () => {
+  it('is true for a comma-separated City, ST ZIP line', () => {
+    expect(isStandaloneAddressTail('Philadelphia, PA 19104')).toBe(true);
+  });
+
+  it('is true for a City ST ZIP line with no comma', () => {
+    expect(isStandaloneAddressTail('Philadelphia PA 19104')).toBe(true);
+  });
+
+  it('is true for a multi-word city with no comma', () => {
+    expect(isStandaloneAddressTail('Fairwood Bend PA 15088')).toBe(true);
+  });
+
+  it('is false for a name or street line', () => {
+    expect(isStandaloneAddressTail('Darrel Taylor')).toBe(false);
+    expect(isStandaloneAddressTail('526 N Budd St # B')).toBe(false);
+  });
+
+  it('is false for an empty line', () => {
+    expect(isStandaloneAddressTail('')).toBe(false);
+  });
+});
+
+describe('parseVoterBlock', () => {
+  it('parses a 1-line block the same as parseVoterLine', () => {
+    expect(parseVoterBlock(['KEZIAH MONTGOMERY, 3389 HAWTHORNE ST, BRIDGEMONT, PA 19188'])).toEqual({
+      name: 'KEZIAH MONTGOMERY',
+      street: '3389 HAWTHORNE ST',
+      city: 'BRIDGEMONT',
+      state: 'PA',
+      zip: '19188',
+    });
+  });
+
+  it('parses a 2-line block (name+street / city, state zip)', () => {
+    expect(parseVoterBlock(['Darrel Taylor, 526 N Budd St # B', 'Philadelphia, PA 19104'])).toEqual({
+      name: 'Darrel Taylor',
+      street: '526 N Budd St # B',
+      city: 'Philadelphia',
+      state: 'PA',
+      zip: '19104',
+    });
+  });
+
+  it('parses a 3-line block with no commas anywhere, matching the real sample shape', () => {
+    expect(parseVoterBlock(['Darrel Taylor', '526 N Budd St # B', 'Philadelphia PA 19104'])).toEqual({
+      name: 'Darrel Taylor',
+      street: '526 N Budd St # B',
+      city: 'Philadelphia',
+      state: 'PA',
+      zip: '19104',
+    });
+  });
+
+  it('returns null when the last line is not a real address tail', () => {
+    expect(parseVoterBlock(['Darrel Taylor', '526 N Budd St # B'])).toBeNull();
   });
 });
