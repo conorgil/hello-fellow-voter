@@ -43,8 +43,15 @@ export function openPasteImportForm(projectId: string, rerender: () => void): vo
   importBtn.textContent = 'Import';
 
   actions.append(cancelBtn, importBtn);
-  form.append(textareaField, actions);
-  panel.append(title, hint, form);
+
+  // Cancel/Import live outside this scrollable area so they stay visible even
+  // when the textarea content overflows the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, hint, textareaField);
+
+  form.append(scrollArea, actions);
+  panel.append(form);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

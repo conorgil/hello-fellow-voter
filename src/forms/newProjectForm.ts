@@ -42,8 +42,15 @@ export function openNewProjectForm(rerender: () => void): void {
   createBtn.textContent = 'Create';
 
   actions.append(cancelBtn, createBtn);
-  form.append(field, errorText, actions);
-  panel.append(title, hint, form);
+
+  // Cancel/Create live outside this scrollable area so they stay visible even
+  // when the content overflows the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, hint, field, errorText);
+
+  form.append(scrollArea, actions);
+  panel.append(form);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

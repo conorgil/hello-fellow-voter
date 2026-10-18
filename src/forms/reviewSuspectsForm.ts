@@ -53,7 +53,14 @@ export function openReviewSuspectsForm(projectId: string, rerender: () => void):
   closeBtn.addEventListener('click', close);
 
   actions.append(addAllBtn, discardAllBtn, closeBtn);
-  panel.append(title, hint, list, actions);
+
+  // Actions live outside this scrollable area so they stay visible even when
+  // the suspect list overflows the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, hint, list);
+
+  panel.append(scrollArea, actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

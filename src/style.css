@@ -802,6 +802,31 @@ button {
   color: var(--color-text);
 }
 
+/* Same square icon-button look as .detail-panel__close, sitting just to its
+   left so neither one lands inside the .gh-corner ribbon's hit area. */
+.detail-panel__view-toggle {
+  position: absolute;
+  top: 0.5rem;
+  right: calc(0.5rem + var(--gh-corner-size) + 2.5rem);
+  z-index: 1;
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-panel);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+.detail-panel__view-toggle:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
 /* Centers the postcard within whatever vertical space is available, letting
    the postcard itself size to a real 4x6in card's 3:2 ratio instead of
    stretching to fill the panel. */
@@ -987,6 +1012,74 @@ button {
   white-space: nowrap;
 }
 
+/* Address-only layout: hides the postcard entirely and shows just the
+   address, large and centered, with its own font-size slider pinned above it. */
+.address-only-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+}
+
+/* The `hidden` attribute's own `display: none` lives in the browser's default
+   (user-agent) stylesheet, which loses to *any* same-or-lower-specificity
+   author rule — including the unconditional `display: flex` above and on
+   .postcard-frame. Without this, toggling `.hidden` has no visual effect and
+   both views render stacked on top of each other. The `[hidden]` attribute
+   selector bumps specificity just enough to win over the plain class rule. */
+.postcard-frame[hidden],
+.address-only-frame[hidden] {
+  display: none;
+}
+
+.address-only-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.25em;
+  font-family: "Courier New", ui-monospace, monospace;
+  text-align: left;
+  max-width: 100%;
+  overflow-y: auto;
+}
+
+.address-only-view__line {
+  line-height: 1.3;
+  /* Unlike the fixed-box postcard address (nowrap + JS shrink-to-fit), there's
+     ample room here, so an unusually long address wraps instead of needing to
+     be measured or clipped, even at the slider's max size. */
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.address-only-font-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--color-text-muted);
+}
+
+.address-only-font-row__hint {
+  line-height: 1;
+}
+.address-only-font-row__hint--small {
+  font-size: 0.8rem;
+}
+.address-only-font-row__hint--large {
+  font-size: 1.3rem;
+}
+
+.address-only-font-slider {
+  width: 220px;
+  accent-color: var(--color-primary);
+}
+
 .detail-panel__footer {
   display: flex;
   align-items: center;
@@ -1150,8 +1243,40 @@ button {
   background: #f0f1f3;
 }
 
+/* Every modal panel pins its Save/Cancel (or equivalent) actions outside the
+   scrollable content, so they're always reachable without scrolling no matter
+   how tall the content gets. Overrides .panel's own overflow-y: auto (same
+   specificity, wins on source order): only .form-panel__scroll scrolls.
+   Content lives in a .form-panel__scroll wrapper; a <form>, when a panel uses
+   one, sits between panel and that wrapper and needs the same flex/overflow
+   treatment so its own trailing .form-actions stays pinned too. */
 .form-panel {
   width: min(420px, 90vw);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.form-panel > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.form-panel__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.form-panel > .form-actions,
+.form-panel > form > .form-actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
 }
 
 .paste-import-panel {

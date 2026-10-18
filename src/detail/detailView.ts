@@ -1,19 +1,24 @@
 import stampImageUrl from '../assets/stamp.jpg';
+import { MAX_ADDRESS_FONT_SIZE, MIN_ADDRESS_FONT_SIZE } from '../addressView';
 import { openMessagePickerForm } from '../forms/messagePickerForm';
 import { isRedoShortcut, isUndoShortcut } from '../keyboardShortcuts';
 import { getFontFamily } from '../postcardFonts';
 import {
   getColumns,
   getLabels,
+  getProjectAddressViewFontSize,
+  getProjectAddressViewMode,
   getProjectMessage,
   getProjectMessageFont,
   getVotersForProject,
   moveVoter,
+  setProjectAddressViewFontSize,
+  setProjectAddressViewMode,
   setProjectMessage,
   setProjectMessageFont,
   toggleVoterLabel,
 } from '../storage';
-import { DONE_STAY, type Voter } from '../types';
+import { DONE_STAY, type AddressViewMode, type Voter } from '../types';
 import { contrastTextColor } from '../ui/color';
 import { createLabelPicker } from '../ui/labelPicker';
 import { showToast } from '../ui/toast';
@@ -78,6 +83,23 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   closeBtn.textContent = '×';
   closeBtn.addEventListener('click', close);
   attachTextTooltip(closeBtn, 'Closes address view without any automations', 400);
+
+  let currentViewMode: AddressViewMode = getProjectAddressViewMode(projectId);
+
+  const viewToggleBtn = document.createElement('button');
+  viewToggleBtn.className = 'detail-panel__view-toggle';
+  const viewToggleIcon = document.createElement('span');
+  viewToggleIcon.className = 'material-symbols-outlined';
+  viewToggleBtn.appendChild(viewToggleIcon);
+  // 'below' (not 'above', like the footer buttons) — this button sits at the
+  // top of the panel, so an 'above' tooltip renders off the top of the viewport.
+  attachTextTooltip(viewToggleBtn, 'Switch to an address-only view, with a larger, adjustable font size', 400, 'below');
+  const viewToggleTooltipEl = viewToggleBtn.querySelector('.tooltip') as HTMLElement;
+  viewToggleBtn.addEventListener('click', () => {
+    currentViewMode = currentViewMode === 'postcard' ? 'address-only' : 'postcard';
+    setProjectAddressViewMode(projectId, currentViewMode);
+    applyViewMode();
+  });
 
   const postcardFrame = document.createElement('div');
   postcardFrame.className = 'postcard-frame';
@@ -204,6 +226,77 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   address.append(nameLine, streetLine, cityLine);
   right.append(stamp, address);
   postcard.append(message, right);
+
+  const addressOnlyFrame = document.createElement('div');
+  addressOnlyFrame.className = 'address-only-frame';
+
+  const addressOnlyLines = document.createElement('div');
+  addressOnlyLines.className = 'address-only-view';
+
+  function addressOnlyLine(text: string): HTMLDivElement {
+    const el = document.createElement('div');
+    el.className = 'address-only-view__line';
+    el.textContent = text;
+    return el;
+  }
+
+  const aoNameLine = addressOnlyLine(titleCase(voter.name));
+  const aoStreetLine = addressOnlyLine(titleCase(voter.street));
+  const aoCityLine = addressOnlyLine(`${titleCase(voter.city)}, ${voter.state} ${voter.zip}`);
+  addressOnlyLines.append(aoNameLine, aoStreetLine, aoCityLine);
+
+  let currentFontSize = getProjectAddressViewFontSize(projectId);
+
+  function applyFontSize(size: number): void {
+    for (const el of [aoNameLine, aoStreetLine, aoCityLine]) el.style.fontSize = `${size}rem`;
+  }
+  applyFontSize(currentFontSize);
+
+  const fontSliderRow = document.createElement('div');
+  fontSliderRow.className = 'address-only-font-row';
+
+  const smallA = document.createElement('span');
+  smallA.className = 'address-only-font-row__hint address-only-font-row__hint--small';
+  smallA.textContent = 'A';
+  smallA.setAttribute('aria-hidden', 'true');
+
+  const fontSlider = document.createElement('input');
+  fontSlider.type = 'range';
+  fontSlider.className = 'address-only-font-slider';
+  fontSlider.min = String(MIN_ADDRESS_FONT_SIZE);
+  fontSlider.max = String(MAX_ADDRESS_FONT_SIZE);
+  fontSlider.step = '0.25';
+  fontSlider.value = String(currentFontSize);
+  fontSlider.setAttribute('aria-label', 'Address font size');
+  fontSlider.addEventListener('input', () => {
+    currentFontSize = parseFloat(fontSlider.value);
+    applyFontSize(currentFontSize);
+  });
+  fontSlider.addEventListener('change', () => {
+    setProjectAddressViewFontSize(projectId, currentFontSize);
+  });
+
+  const largeA = document.createElement('span');
+  largeA.className = 'address-only-font-row__hint address-only-font-row__hint--large';
+  largeA.textContent = 'A';
+  largeA.setAttribute('aria-hidden', 'true');
+
+  fontSliderRow.append(smallA, fontSlider, largeA);
+  // Slider row first so it stays pinned at a fixed spot as the address text
+  // below grows/shrinks with it, instead of drifting with the centered block.
+  addressOnlyFrame.append(fontSliderRow, addressOnlyLines);
+
+  function applyViewMode(): void {
+    const isAddressOnly = currentViewMode === 'address-only';
+    postcardFrame.hidden = isAddressOnly;
+    addressOnlyFrame.hidden = !isAddressOnly;
+    viewToggleIcon.textContent = isAddressOnly ? 'image' : 'contact_mail';
+    viewToggleBtn.setAttribute('aria-label', isAddressOnly ? 'Switch to postcard view' : 'Switch to address-only view');
+    viewToggleTooltipEl.textContent = isAddressOnly
+      ? 'Switch back to the postcard view'
+      : 'Switch to an address-only view, with a larger, adjustable font size';
+    if (!isAddressOnly) shrinkLinesToFit([nameLine, streetLine, cityLine]);
+  }
 
   const labelsContent = document.createElement('div');
   labelsContent.className = 'detail-panel__labels detail-panel__footer-labels';
@@ -356,9 +449,11 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     footerActions.append(advanceBtn);
   }
 
-  panel.append(closeBtn, postcardFrame, footer);
+  panel.append(closeBtn, viewToggleBtn, postcardFrame, addressOnlyFrame, footer);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
+
+  applyViewMode();
 
   // Re-run now that `message` is actually attached, so the message box's
   // dynamic line-count measurement reflects real layout instead of skipping
@@ -370,8 +465,11 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
   // The postcard (and the address column inside it) resizes with the
   // window/panel — re-fit on every size change instead of only once at open,
   // otherwise shrinking the window after opening leaves the address at a
-  // stale, now-too-large font size and it clips.
+  // stale, now-too-large font size and it clips. No-ops while the postcard is
+  // hidden (address-only view) — its box has no size to measure, and
+  // applyViewMode re-fits it anyway on switching back.
   const addressResizeObserver = new ResizeObserver(() => {
+    if (postcardFrame.hidden) return;
     shrinkLinesToFit([nameLine, streetLine, cityLine]);
   });
   addressResizeObserver.observe(postcard);

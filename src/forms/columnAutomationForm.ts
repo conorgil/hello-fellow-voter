@@ -288,8 +288,15 @@ export function openColumnAutomationForm(projectId: string, column: Column, rere
   saveBtn.textContent = 'Save';
 
   actions.append(cancelBtn, saveBtn);
-  form.append(onOpenGroup, doneGroup, nextGroup, labelGroup, actions);
-  panel.append(title, form);
+
+  // Save/Cancel live outside this scrollable area so they stay visible even
+  // when the automation groups overflow the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, onOpenGroup, doneGroup, nextGroup, labelGroup);
+
+  form.append(scrollArea, actions);
+  panel.append(form);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

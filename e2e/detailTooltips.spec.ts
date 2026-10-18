@@ -21,6 +21,12 @@ test('button tooltips describe what each button will do', async ({ page }) => {
   // The visible close button's accessible name is unaffected by the tooltip.
   await expect(closeBtn).toHaveAttribute('aria-label', 'Close');
 
+  const viewToggleBtn = page.locator('.detail-panel__view-toggle');
+  await viewToggleBtn.hover();
+  await expect(viewToggleBtn.locator('.tooltip')).toHaveText(
+    'Switch to an address-only view, with a larger, adjustable font size',
+  );
+
   const doneBtn = page.getByRole('button', { name: 'Done', exact: true });
   await doneBtn.hover();
   await expect(doneBtn.locator('.tooltip')).toHaveText('Closes address view without moving First Voter');
@@ -43,4 +49,25 @@ test('Done tooltip reflects "(Do not move current voter)" when the voter stays i
   const doneBtn = page.getByRole('button', { name: 'Done', exact: true });
   await doneBtn.hover();
   await expect(doneBtn.locator('.tooltip')).toHaveText('Closes address view without moving Jane Doe');
+});
+
+test('tooltips on the buttons near the top of the panel render within the viewport', async ({ page }) => {
+  // `toBeVisible`/`toHaveText` pass even when a tooltip is positioned off the
+  // top of the viewport (not display:none, just scrolled out of view) — this
+  // bit the view-toggle button for real, since it defaulted to the 'above'
+  // placement used by the footer buttons despite sitting at the panel's top
+  // edge. Guards that regression with an actual bounding-box check.
+  await addVoter(page, { name: 'Jane Doe', street: '123 Main St', city: 'Springfield', state: 'IL', zip: '62704' });
+  await page.locator('.voter-card', { hasText: 'Jane Doe' }).click();
+  await page.waitForSelector('.detail-panel', { state: 'visible' });
+
+  for (const selector of ['.detail-panel__close', '.detail-panel__view-toggle']) {
+    const btn = page.locator(selector);
+    await btn.hover();
+    const tooltip = btn.locator('.tooltip');
+    await expect(tooltip).toBeVisible();
+    const tooltipBox = await tooltip.boundingBox();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox!.y).toBeGreaterThanOrEqual(0);
+  }
 });

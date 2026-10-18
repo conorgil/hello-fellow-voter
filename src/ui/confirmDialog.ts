@@ -39,7 +39,14 @@ export function confirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
     confirmBtn.addEventListener('click', () => finish(true));
 
     actions.append(cancelBtn, confirmBtn);
-    panel.append(title, message, actions);
+
+    // Cancel/Confirm live outside this scrollable area so they stay visible
+    // even when a long message overflows the panel's max height.
+    const scrollArea = document.createElement('div');
+    scrollArea.className = 'form-panel__scroll';
+    scrollArea.append(title, message);
+
+    panel.append(scrollArea, actions);
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
 

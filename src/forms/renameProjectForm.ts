@@ -40,8 +40,15 @@ export function openRenameProjectForm(project: Project, rerender: () => void): v
   saveBtn.textContent = 'Save';
 
   actions.append(cancelBtn, saveBtn);
-  form.append(field, errorText, actions);
-  panel.append(title, form);
+
+  // Cancel/Save live outside this scrollable area so they stay visible even
+  // when the content overflows the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, field, errorText);
+
+  form.append(scrollArea, actions);
+  panel.append(form);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

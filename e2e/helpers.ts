@@ -57,6 +57,15 @@ export async function createLabel(page: Page, name: string): Promise<void> {
   await page.locator('.label-manager__add-form button[type="submit"]').click();
 }
 
+/** Sets a <input type="range"> value and fires the events its listeners expect — `.fill()` doesn't work on range inputs. */
+export async function setRangeInputValue(locator: Locator, value: number): Promise<void> {
+  await locator.evaluate((el: HTMLInputElement, v: number) => {
+    el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
 export async function addVoter(
   page: Page,
   voter: { name: string; street: string; city: string; state: string; zip: string },

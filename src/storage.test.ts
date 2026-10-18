@@ -1,4 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  clampAddressFontSize,
+  DEFAULT_ADDRESS_FONT_SIZE,
+  DEFAULT_ADDRESS_VIEW_MODE,
+  MAX_ADDRESS_FONT_SIZE,
+  MIN_ADDRESS_FONT_SIZE,
+} from './addressView';
 import { DEFAULT_MESSAGE } from './postcardMessages';
 import {
   addColumn,
@@ -16,6 +23,8 @@ import {
   deleteVoter,
   getColumns,
   getLabels,
+  getProjectAddressViewFontSize,
+  getProjectAddressViewMode,
   getProjectMessage,
   getVotersForProject,
   getSuspectQueue,
@@ -29,6 +38,8 @@ import {
   renameProject,
   reorderColumns,
   setColumnAutomation,
+  setProjectAddressViewFontSize,
+  setProjectAddressViewMode,
   setProjectMessage,
   toggleVoterLabel,
   undo,
@@ -241,6 +252,68 @@ describe('project message', () => {
   it('is a no-op for an unknown project id', () => {
     expect(() => setProjectMessage('not-a-real-id', 'Hello')).not.toThrow();
     expect(getProjectMessage('not-a-real-id')).toBe('');
+  });
+});
+
+describe('project address view mode and font size', () => {
+  it('defaults to postcard mode and the default font size for a freshly created project', () => {
+    const project = mustCreateProject('Address View Default Project');
+    expect(getProjectAddressViewMode(project.id)).toBe(DEFAULT_ADDRESS_VIEW_MODE);
+    expect(getProjectAddressViewFontSize(project.id)).toBe(DEFAULT_ADDRESS_FONT_SIZE);
+  });
+
+  it('round-trips the view mode', () => {
+    const project = mustCreateProject('Address View Mode Round Trip Project');
+    setProjectAddressViewMode(project.id, 'address-only');
+    expect(getProjectAddressViewMode(project.id)).toBe('address-only');
+    setProjectAddressViewMode(project.id, 'postcard');
+    expect(getProjectAddressViewMode(project.id)).toBe('postcard');
+  });
+
+  it('is a no-op to set the view mode for an unknown project id', () => {
+    expect(() => setProjectAddressViewMode('not-a-real-id', 'address-only')).not.toThrow();
+    expect(getProjectAddressViewMode('not-a-real-id')).toBe(DEFAULT_ADDRESS_VIEW_MODE);
+  });
+
+  it('round-trips an in-range font size', () => {
+    const project = mustCreateProject('Address View Font Size Round Trip Project');
+    const inRangeSize = (MIN_ADDRESS_FONT_SIZE + MAX_ADDRESS_FONT_SIZE) / 2;
+    setProjectAddressViewFontSize(project.id, inRangeSize);
+    expect(getProjectAddressViewFontSize(project.id)).toBe(inRangeSize);
+  });
+
+  it('clamps a font size below the minimum', () => {
+    const project = mustCreateProject('Address View Font Size Clamp Low Project');
+    setProjectAddressViewFontSize(project.id, MIN_ADDRESS_FONT_SIZE - 5);
+    expect(getProjectAddressViewFontSize(project.id)).toBe(MIN_ADDRESS_FONT_SIZE);
+  });
+
+  it('clamps a font size above the maximum', () => {
+    const project = mustCreateProject('Address View Font Size Clamp High Project');
+    setProjectAddressViewFontSize(project.id, MAX_ADDRESS_FONT_SIZE + 5);
+    expect(getProjectAddressViewFontSize(project.id)).toBe(MAX_ADDRESS_FONT_SIZE);
+  });
+
+  it('is a no-op to set the font size for an unknown project id', () => {
+    expect(() => setProjectAddressViewFontSize('not-a-real-id', 6)).not.toThrow();
+    expect(getProjectAddressViewFontSize('not-a-real-id')).toBe(DEFAULT_ADDRESS_FONT_SIZE);
+  });
+});
+
+describe('clampAddressFontSize', () => {
+  it('passes through an in-range value unchanged', () => {
+    const mid = (MIN_ADDRESS_FONT_SIZE + MAX_ADDRESS_FONT_SIZE) / 2;
+    expect(clampAddressFontSize(mid)).toBe(mid);
+  });
+
+  it('passes through the exact min and max boundaries unchanged', () => {
+    expect(clampAddressFontSize(MIN_ADDRESS_FONT_SIZE)).toBe(MIN_ADDRESS_FONT_SIZE);
+    expect(clampAddressFontSize(MAX_ADDRESS_FONT_SIZE)).toBe(MAX_ADDRESS_FONT_SIZE);
+  });
+
+  it('clamps values outside the range', () => {
+    expect(clampAddressFontSize(MIN_ADDRESS_FONT_SIZE - 1)).toBe(MIN_ADDRESS_FONT_SIZE);
+    expect(clampAddressFontSize(MAX_ADDRESS_FONT_SIZE + 1)).toBe(MAX_ADDRESS_FONT_SIZE);
   });
 });
 
@@ -562,6 +635,44 @@ describe('message migration backfill', () => {
     localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
 
     expect(getProjectMessage('legacy-project')).toBe('My own hand-written message');
+  });
+});
+
+describe('address view migration backfill', () => {
+  it('backfills the default view mode and font size for pre-existing projects with neither stored', () => {
+    const raw = {
+      version: 1,
+      projects: [{ id: 'legacy-project', name: 'Legacy Project', createdAt: '2025-01-01T00:00:00.000Z' }],
+      activeProjectId: 'legacy-project',
+      voters: [],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    expect(getProjectAddressViewMode('legacy-project')).toBe(DEFAULT_ADDRESS_VIEW_MODE);
+    expect(getProjectAddressViewFontSize('legacy-project')).toBe(DEFAULT_ADDRESS_FONT_SIZE);
+  });
+
+  it('leaves an already-set view mode and font size untouched', () => {
+    const raw = {
+      version: 1,
+      projects: [
+        {
+          id: 'legacy-project',
+          name: 'Legacy Project',
+          createdAt: '2025-01-01T00:00:00.000Z',
+          addressViewMode: 'address-only',
+          addressViewFontSize: 7,
+        },
+      ],
+      activeProjectId: 'legacy-project',
+      voters: [],
+      suspectQueues: {},
+    };
+    localStorage.setItem('hello-fellow-voter:v1', JSON.stringify(raw));
+
+    expect(getProjectAddressViewMode('legacy-project')).toBe('address-only');
+    expect(getProjectAddressViewFontSize('legacy-project')).toBe(7);
   });
 });
 

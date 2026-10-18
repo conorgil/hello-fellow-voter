@@ -51,7 +51,14 @@ export function openPdfImportForm(projectId: string, rerender: () => void): void
   cancelBtn.addEventListener('click', close);
 
   actions.append(cancelBtn);
-  panel.append(title, dropZone, actions);
+
+  // Cancel lives outside this scrollable area so it stays visible even when
+  // the drop zone overflows the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, dropZone);
+
+  panel.append(scrollArea, actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

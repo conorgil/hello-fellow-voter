@@ -162,17 +162,13 @@ export function openMessagePickerForm(
 
   actions.append(cancelBtn, saveBtn);
 
-  panel.append(
-    title,
-    introPara1,
-    introPara2,
-    optionsList,
-    customTextarea,
-    lengthWarning,
-    errorText,
-    fontField,
-    actions,
-  );
+  // Save/Cancel live outside this scrollable area so they stay visible even
+  // when the message options + font picker overflow the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, introPara1, introPara2, optionsList, customTextarea, lengthWarning, errorText, fontField);
+
+  panel.append(scrollArea, actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

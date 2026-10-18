@@ -30,7 +30,13 @@ export function openLabelManagerForm(projectId: string, rerender: () => void): v
   actions.className = 'form-actions';
   actions.append(closeBtn);
 
-  panel.append(title, list, addSection, actions);
+  // Close lives outside this scrollable area so it stays visible even when
+  // the label list overflows the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(title, list, addSection);
+
+  panel.append(scrollArea, actions);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 

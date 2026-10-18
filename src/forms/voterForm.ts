@@ -47,15 +47,22 @@ export function openVoterForm(projectId: string, rerender: () => void, existing?
   saveBtn.textContent = existing ? 'Save changes' : 'Add voter';
 
   actions.append(cancelBtn, saveBtn);
-  form.append(
+
+  // Save/Cancel live outside this scrollable area so they stay visible even
+  // when the fields overflow the panel's max height.
+  const scrollArea = document.createElement('div');
+  scrollArea.className = 'form-panel__scroll';
+  scrollArea.append(
+    title,
     nameField.wrapper,
     streetField.wrapper,
     cityField.wrapper,
     stateField.wrapper,
     zipField.wrapper,
-    actions,
   );
-  panel.append(title, form);
+
+  form.append(scrollArea, actions);
+  panel.append(form);
   overlay.appendChild(panel);
   document.body.appendChild(overlay);
 
