@@ -1,7 +1,8 @@
-import type { Column, ColumnAutomation, ColumnId, Label, Project, StoredState, Voter } from './types';
+import type { AddressViewMode, Column, ColumnAutomation, ColumnId, Label, Project, StoredState, Voter } from './types';
 import { DEFAULT_COLUMNS } from './types';
 import { DEFAULT_MESSAGE } from './postcardMessages';
 import { DEFAULT_MESSAGE_FONT } from './postcardFonts';
+import { clampAddressFontSize, DEFAULT_ADDRESS_FONT_SIZE, DEFAULT_ADDRESS_VIEW_MODE } from './addressView';
 
 const STORAGE_KEY = 'hello-fellow-voter:v1';
 
@@ -76,6 +77,13 @@ function loadState(): StoredState {
       // Older stored state predates the selectable postcard message font.
       if (typeof project.messageFont !== 'string' || project.messageFont === '') {
         project.messageFont = DEFAULT_MESSAGE_FONT;
+      }
+      // Older stored state predates the address-only view mode and its font size.
+      if (project.addressViewMode !== 'postcard' && project.addressViewMode !== 'address-only') {
+        project.addressViewMode = DEFAULT_ADDRESS_VIEW_MODE;
+      }
+      if (typeof project.addressViewFontSize !== 'number' || !Number.isFinite(project.addressViewFontSize)) {
+        project.addressViewFontSize = DEFAULT_ADDRESS_FONT_SIZE;
       }
 
       // Older stored state predates configurable column automation; backfill the
@@ -195,6 +203,8 @@ export function createProject(name: string): Project | null {
     createdAt: new Date().toISOString(),
     message: DEFAULT_MESSAGE,
     messageFont: DEFAULT_MESSAGE_FONT,
+    addressViewMode: DEFAULT_ADDRESS_VIEW_MODE,
+    addressViewFontSize: DEFAULT_ADDRESS_FONT_SIZE,
   };
   state.projects.push(project);
   state.activeProjectId = project.id;
@@ -240,6 +250,34 @@ export function setProjectMessageFont(id: string, fontId: string): void {
   const project = state.projects.find((p) => p.id === id);
   if (!project) return;
   project.messageFont = fontId;
+  saveState(state);
+}
+
+export function getProjectAddressViewMode(id: string): AddressViewMode {
+  const project = loadState().projects.find((p) => p.id === id);
+  return project?.addressViewMode ?? DEFAULT_ADDRESS_VIEW_MODE;
+}
+
+/** Silently no-ops if the project doesn't exist. */
+export function setProjectAddressViewMode(id: string, mode: AddressViewMode): void {
+  const state = loadState();
+  const project = state.projects.find((p) => p.id === id);
+  if (!project) return;
+  project.addressViewMode = mode;
+  saveState(state);
+}
+
+export function getProjectAddressViewFontSize(id: string): number {
+  const project = loadState().projects.find((p) => p.id === id);
+  return project?.addressViewFontSize ?? DEFAULT_ADDRESS_FONT_SIZE;
+}
+
+/** Silently no-ops if the project doesn't exist. Clamps to [MIN_ADDRESS_FONT_SIZE, MAX_ADDRESS_FONT_SIZE]. */
+export function setProjectAddressViewFontSize(id: string, size: number): void {
+  const state = loadState();
+  const project = state.projects.find((p) => p.id === id);
+  if (!project) return;
+  project.addressViewFontSize = clampAddressFontSize(size);
   saveState(state);
 }
 

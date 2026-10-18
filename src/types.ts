@@ -107,6 +107,8 @@ export interface Label {
   color: string;
 }
 
+export type AddressViewMode = 'postcard' | 'address-only';
+
 export interface Project {
   id: string;
   name: string;
@@ -114,6 +116,9 @@ export interface Project {
   message: string;
   /** id into MESSAGE_FONTS (src/postcardFonts.ts) */
   messageFont: string;
+  addressViewMode: AddressViewMode;
+  /** rem units; see src/addressView.ts for min/max/default */
+  addressViewFontSize: number;
 }
 
 export interface Voter {
