@@ -1,5 +1,6 @@
 import type { ImportResult } from '../pdf/importPdf';
-import { addLabelToVoters, getVotersForProject, removeLabelFromVoters } from '../storage';
+import { addLabelToVoters, getLabels, getVotersForProject, removeLabelFromVoters } from '../storage';
+import { contrastTextColor } from '../ui/color';
 import { formatImportMessage } from '../ui/importMessage';
 import { createLabelPicker } from '../ui/labelPicker';
 
@@ -45,7 +46,6 @@ export function renderResultsPhase(
   const summary = document.createElement('p');
   summary.className = 'import-result-summary';
   summary.textContent = formatImportMessage(result);
-  scrollArea.replaceChildren(summary);
 
   const importedIds = result.importedVoterIds;
   const doneBtn = document.createElement('button');
@@ -55,9 +55,52 @@ export function renderResultsPhase(
   doneBtn.addEventListener('click', onDone);
 
   if (importedIds.length === 0) {
+    scrollArea.replaceChildren(summary);
     actions.replaceChildren(doneBtn);
     actions.hidden = false;
     return;
+  }
+
+  // Sits in the scrollable area (not the pinned actions row, which the
+  // picker itself occupies) so it can grow to as many chips as needed
+  // without squeezing the picker/Done buttons.
+  const chipRow = document.createElement('div');
+  chipRow.className = 'import-result-labels detail-panel__footer-labels';
+  scrollArea.replaceChildren(summary, chipRow);
+
+  function hasLabel(labelId: string): boolean {
+    return importedIds.every((id) => getVotersForProject(projectId).find((v) => v.id === id)?.labelIds.includes(labelId));
+  }
+
+  // Mirrors the selected labels as removable chips, same look as the voter
+  // detail view's label list, so the picker's checkmarks (easy to miss in a
+  // closed dropdown) aren't the only confirmation a label was applied.
+  function renderChips(): void {
+    chipRow.replaceChildren();
+    for (const label of getLabels(projectId).filter((l) => hasLabel(l.id))) {
+      const badge = document.createElement('span');
+      badge.className = 'label-badge';
+      badge.style.backgroundColor = label.color;
+      badge.style.color = contrastTextColor(label.color);
+
+      const text = document.createElement('span');
+      text.textContent = label.name;
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'label-badge__remove';
+      removeBtn.setAttribute('aria-label', `Remove label ${label.name}`);
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', () => {
+        removeLabelFromVoters(importedIds, label.id);
+        renderChips();
+        renderLabelPicker();
+        rerender();
+      });
+
+      badge.append(text, removeBtn);
+      chipRow.appendChild(badge);
+    }
   }
 
   // Lives in the pinned actions row (not the scrollable area) and opens
@@ -71,9 +114,6 @@ export function renderResultsPhase(
   // callers (board batch bar, voter detail view) use, since the picker only
   // refreshes its own list on open.
   function renderLabelPicker(): void {
-    const hasLabel = (labelId: string) =>
-      importedIds.every((id) => getVotersForProject(projectId).find((v) => v.id === id)?.labelIds.includes(labelId));
-
     const picker = createLabelPicker(
       'Add labels to new voters',
       projectId,
@@ -84,6 +124,7 @@ export function renderResultsPhase(
         } else {
           addLabelToVoters(importedIds, labelId);
         }
+        renderChips();
         renderLabelPicker();
       },
       rerender,
@@ -99,6 +140,7 @@ export function renderResultsPhase(
     actions.replaceChildren(picker, doneBtn);
   }
 
+  renderChips();
   renderLabelPicker();
   actions.hidden = false;
 }
