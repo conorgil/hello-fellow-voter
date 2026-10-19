@@ -7,6 +7,8 @@ import { isSplashPermanentlyDismissed } from './splash/splashPrefs';
 import { openSplash } from './splash/splashView';
 import { getActiveProject, redo, undo } from './storage';
 import { attachTextTooltip } from './ui/tooltip';
+import { showUpdateAvailableBanner } from './update/updateBanner';
+import { startVersionPolling } from './update/versionCheck';
 
 const app: HTMLDivElement =
   document.querySelector<HTMLDivElement>('#app') ??
@@ -78,3 +80,5 @@ if (ghCorner) {
 if (!isSplashPermanentlyDismissed()) {
   openSplash();
 }
+
+startVersionPolling(showUpdateAvailableBanner);

@@ -1900,6 +1900,57 @@ button {
   color: var(--color-text-muted);
 }
 
+/* --- Update-available banner --- */
+
+.update-banner {
+  position: fixed;
+  top: 1rem;
+  /* Offset past the .gh-corner ribbon (top-right, --gh-corner-size square),
+     same convention as .board-header's padding-right and .detail-panel__close
+     above; cleared back to a plain 1rem inset on mobile, where that ribbon
+     is hidden. */
+  right: calc(1rem + var(--gh-corner-size));
+  /* Below .overlay's z-index (100), not above it: an open modal (e.g. the
+     splash screen, which reopens on every page load) centers its own panel
+     vertically, so its corner controls can land anywhere on screen — no
+     fixed offset here could reliably dodge them. Sitting behind the overlay
+     means an open modal's backdrop simply covers this banner instead of the
+     reverse; it reappears untouched once the modal closes. */
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 0.75rem 2.25rem 0.75rem 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  max-width: min(360px, calc(100vw - 2rem));
+}
+
+.update-banner__message {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.update-banner__close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 640px), (max-height: 640px) {
+  .update-banner {
+    right: 1rem;
+  }
+}
+
 /*
  * .gh-corner / .gh-corner__icon are defined inline in index.html's <head>,
  * not here. That markup is static HTML present on first paint, before this
