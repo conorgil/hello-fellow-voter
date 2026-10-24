@@ -17,6 +17,7 @@ import {
   setProjectMessage,
   setProjectMessageFont,
   toggleVoterLabel,
+  undo,
 } from '../storage';
 import { DONE_STAY, type AddressViewMode, type Voter } from '../types';
 import { contrastTextColor } from '../ui/color';
@@ -502,6 +503,14 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     addressResizeObserver.disconnect();
   }
 
+  // Shared with the ArrowLeft undo below — refreshes the modal's own message
+  // display after a storage mutation it didn't initiate from a button click.
+  function refreshMessageDisplay(): void {
+    currentMessage = getProjectMessage(projectId);
+    currentFont = getProjectMessageFont(projectId);
+    showMessageDisplay();
+  }
+
   function onKeydown(e: KeyboardEvent): void {
     const active = document.activeElement;
     if (active instanceof HTMLTextAreaElement && panel.contains(active)) return;
@@ -511,9 +520,7 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     // the board underneath — this modal is a standalone overlay, so its message
     // display needs its own refresh to pick up the reverted/reapplied value.
     if (isUndoShortcut(e) || isRedoShortcut(e)) {
-      currentMessage = getProjectMessage(projectId);
-      currentFont = getProjectMessageFont(projectId);
-      showMessageDisplay();
+      refreshMessageDisplay();
     }
 
     if (e.key === 'Escape') {
@@ -521,6 +528,15 @@ export function openDetailView(voter: Voter, projectId: string, rerender: () => 
     } else if (e.key === 'ArrowRight') {
       e.preventDefault();
       goToNextVoter();
+    } else if (e.key === 'ArrowLeft') {
+      // Mirrors the global Cmd+Z shortcut: lets an "advance" mistake (the
+      // ArrowRight/Next-voter move) be corrected without reaching for the
+      // keyboard shortcut or leaving the modal.
+      e.preventDefault();
+      if (undo()) {
+        rerender();
+        refreshMessageDisplay();
+      }
     }
   }
   document.addEventListener('keydown', onKeydown);
